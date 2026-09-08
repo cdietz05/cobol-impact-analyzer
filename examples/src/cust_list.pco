@@ -1,0 +1,25 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUSTLIST.
+      *****************************************************************
+      * RECOMPILE-ONLY CASE - READS THE CUSTOMER ROW INTO THE TABLE'S  *
+      * OWN COPYBOOK RECORD AND DOES NOTHING ELSE WITH IT. WHEN        *
+      * CUST_NAME WIDENS, CUSTOMER.CPY CHANGES AND THIS PROGRAM HAS TO *
+      * BE REBUILT AGAINST IT - BUT NOTHING IN THIS SOURCE FILE NEEDS  *
+      * EDITING, BECAUSE EVERY FIELD IT TOUCHES IS DECLARED IN THE     *
+      * COPYBOOK AND NO STATEMENT HERE ASSUMES THE OLD WIDTH.          *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CUSTOMER END-EXEC.
+       01  WS-ROW-COUNT             PIC S9(9)       COMP-3.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT CUST_NAME, CUST_CITY
+                 INTO :CUST-NAME, :CUST-CITY
+                 FROM CUSTOMER
+                WHERE CUST_ID = :CUST-ID
+           END-EXEC
+           ADD 1 TO WS-ROW-COUNT
+           GOBACK.

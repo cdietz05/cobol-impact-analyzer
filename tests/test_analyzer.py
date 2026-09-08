@@ -35,13 +35,13 @@ class PropagationTests(unittest.TestCase):
         cls.result = _run_name_widening()
 
     def test_the_direct_host_variable_is_critical(self):
-        findings = _find(self.result, "var:CUST-NAME")
+        findings = _find(self.result, "var:CUSTUPD::CUST-NAME")
         self.assertTrue(findings)
         self.assertIs(findings[0].severity, Severity.CRITICAL)
         self.assertIn("X(60)", findings[0].remediation)
 
     def test_one_hop_move_target_is_reported(self):
-        findings = _find(self.result, "var:RL-CUST-NAME")
+        findings = _find(self.result, "var:CUSTUPD::RL-CUST-NAME")
         self.assertTrue(findings)
         self.assertIn("X(60)", findings[0].remediation)
 
@@ -77,27 +77,34 @@ class PropagationTests(unittest.TestCase):
     def test_group_record_length_change_is_reported(self):
         findings = [
             finding
-            for finding in _find(self.result, "var:CUSTOMER-REC")
+            for finding in _find(self.result, "var:CUSTUPD::CUSTOMER-REC")
             if finding.category == "record-layout"
         ]
         self.assertTrue(findings)
         self.assertIn("bytes", findings[0].required)
 
-    def test_reference_modification_is_surfaced(self):
-        refmod = [
-            finding
-            for finding in self.result.findings
-            if finding.category == "reference-modification"
-        ]
-        self.assertTrue(refmod)
-        self.assertIs(refmod[0].severity, Severity.HIGH)
+    def test_reference_modification_is_surfaced_on_the_field_it_affects(self):
+        # A REFMOD used to be its own finding. It is a note on the field's own
+        # finding now, so one field is one row however many ways it is used -
+        # see _attach_usage_notes.
+        findings = _find(self.result, "var:CUSTUPD::CUST-NAME")
+        self.assertTrue(findings)
+        self.assertIn("reference-modification", findings[0].detail)
+
+    def test_a_field_is_reported_once_per_program_however_often_it_is_used(self):
+        for node_id in {finding.node_id for finding in self.result.findings}:
+            self.assertEqual(
+                len(_find(self.result, node_id)),
+                1,
+                f"{node_id} produced more than one finding",
+            )
 
     def test_every_finding_carries_a_path_back_to_a_change(self):
         for finding in self.result.findings:
             self.assertTrue(finding.path, finding.title)
 
     def test_paths_start_at_the_changed_column(self):
-        findings = _find(self.result, "var:RL-CUST-NAME")
+        findings = _find(self.result, "var:CUSTUPD::RL-CUST-NAME")
         self.assertEqual(findings[0].path[0], "col:CUSTOMER.CUST_NAME")
 
 
@@ -106,7 +113,7 @@ class NumericPropagationTests(unittest.TestCase):
         result = analyze(
             _spec(build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"))
         )
-        findings = _find(result, "var:CUST-BALANCE")
+        findings = _find(result, "var:CUSTUPD::CUST-BALANCE")
         self.assertTrue(findings)
         self.assertIn("9(11)", findings[0].remediation)
 
@@ -114,7 +121,7 @@ class NumericPropagationTests(unittest.TestCase):
         result = analyze(
             _spec(build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"))
         )
-        self.assertTrue(_find(result, "var:RL-BALANCE"))
+        self.assertTrue(_find(result, "var:CUSTUPD::RL-BALANCE"))
 
 
 class CoverageTests(unittest.TestCase):
@@ -138,7 +145,7 @@ class NameSpellingTests(unittest.TestCase):
         result = _run_name_widening()
         # CUSTOMER.CUST_NAME (underscore) reaches CUST-NAME (hyphen) because the
         # binding comes from the SELECT INTO, never from matching the spellings.
-        findings = _find(result, "var:CUST-NAME")
+        findings = _find(result, "var:CUSTUPD::CUST-NAME")
         self.assertTrue(findings)
         self.assertEqual(findings[0].path[0], "col:CUSTOMER.CUST_NAME")
 
@@ -218,7 +225,7 @@ class ReportTests(unittest.TestCase):
 
     def test_json_is_valid_and_carries_findings(self):
         payload = json.loads(report.to_json(self.result))
-        self.assertEqual(payload["summary"]["programs_scanned"], 3)
+        self.assertEqual(payload["summary"]["programs_scanned"], 4)
         self.assertTrue(payload["findings"])
         self.assertTrue(payload["ddl_plan"])
 
@@ -289,6 +296,78 @@ class CliTests(unittest.TestCase):
             ]
         )
         self.assertEqual(code, 1)
+
+
+class ProgramImpactTests(unittest.TestCase):
+    """Who has to open a program, versus who only has to rebuild it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _run_name_widening()
+
+    def _impact(self, name):
+        for impact in self.result.program_impacts:
+            if impact.program == name:
+                return impact
+        self.fail(f"{name} is not in the program impacts")
+
+    def test_a_program_that_only_copies_the_table_record_is_recompile_only(self):
+        # CUSTLIST selects into the CUSTOMER copybook record and does nothing
+        # else. The copybook changes, so it has to be rebuilt - but there is
+        # nothing in its own source to edit.
+        impact = self._impact("CUSTLIST")
+        self.assertTrue(impact.recompile_only)
+        self.assertEqual(impact.verdict, "recompile only")
+        self.assertEqual(impact.own_work, [])
+        self.assertTrue(any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks))
+
+    def test_a_program_with_its_own_widened_field_is_a_source_change(self):
+        impact = self._impact("CUSTUPD")
+        self.assertFalse(impact.recompile_only)
+        self.assertEqual(impact.verdict, "source change")
+        self.assertTrue(impact.own_work)
+
+    def test_a_statement_assuming_the_old_width_is_work_even_on_a_copybook_field(self):
+        # CUST-NAME is declared in CUSTOMER.cpy, but CUSTUPD reference-modifies
+        # it in its own PROCEDURE DIVISION - that edit belongs to CUSTUPD.
+        impact = self._impact("CUSTUPD")
+        self.assertTrue(
+            any("CUST-NAME used via reference-modification" in item for item in impact.own_work)
+        )
+
+    def test_an_untouched_program_is_not_listed_at_all(self):
+        listed = {impact.program for impact in self.result.program_impacts}
+        scanned = {program.name for program in self.result.programs}
+        self.assertTrue(listed <= scanned)
+        result = analyze(_spec(build_change("CUSTOMER", "NEVER_USED", "CHAR(1)", "CHAR(4)")))
+        self.assertEqual(result.program_impacts, [])
+
+
+class VariableScopeTests(unittest.TestCase):
+    """A copybook field is one node PER PROGRAM, not one node globally."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _run_name_widening()
+
+    def test_the_same_copybook_field_is_a_separate_node_in_each_program(self):
+        node_ids = {finding.node_id for finding in self.result.findings}
+        self.assertIn("var:CUSTUPD::CUST-NAME", node_ids)
+        self.assertIn("var:ORDENTRY::CUST-NAME", node_ids)
+        # The old global id linked every program's copy into one node, which is
+        # what invented flows between programs that never call each other.
+        self.assertNotIn("var:CUST-NAME", node_ids)
+
+    def test_a_route_never_crosses_into_another_program_without_a_call(self):
+        for finding in self.result.findings:
+            programs = [
+                node_id.split("::", 1)[0][4:]
+                for node_id in finding.path
+                if node_id.startswith("var:") and "::" in node_id
+            ]
+            # FMTNAME is reached by CALL USING, so a path may legitimately name
+            # two programs; it must never name three unrelated ones.
+            self.assertLessEqual(len(set(programs)), 2, finding.path)
 
 
 if __name__ == "__main__":

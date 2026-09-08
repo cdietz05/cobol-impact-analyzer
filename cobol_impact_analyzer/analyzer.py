@@ -56,6 +56,35 @@ _LAYOUT = frozenset({EdgeKind.GROUP_PARENT, EdgeKind.REDEFINES})
 _MIN_RELAXATION_BUDGET = 200_000
 _RELAXATION_BUDGET_FACTOR = 20
 
+# Mentions of a field that carry no width but break when it grows. Folded into
+# that field's own finding rather than raised separately - see
+# _attach_usage_notes.
+_USAGE_SEVERITY = {
+    "reference-modification": Severity.HIGH,
+    "literal-comparison": Severity.MEDIUM,
+    "inspect": Severity.MEDIUM,
+    "display": Severity.LOW,
+    "file-write": Severity.MEDIUM,
+    "initialize": Severity.LOW,
+    "set": Severity.LOW,
+}
+_USAGE_ADVICE = {
+    "reference-modification": (
+        "the offset/length is hard-coded and will not follow the new width."
+    ),
+    "literal-comparison": (
+        "the literal is padded to the field width, so a wider field changes the "
+        "comparison."
+    ),
+    "inspect": (
+        "INSPECT scans the whole field including trailing spaces, so counts change."
+    ),
+    "display": "report or log column alignment shifts.",
+    "file-write": "the output record grows; downstream readers need the new layout.",
+    "initialize": "confirm the initialised value still fits.",
+    "set": "confirm the SET target still matches the new width.",
+}
+
 
 @dataclass
 class ImpactGraph:
@@ -107,6 +136,50 @@ class ImpactGraph:
 
 
 @dataclass
+class ProgramImpact:
+    """What one program's maintainer actually has to do.
+
+    The distinction that matters on a change like this is not how many findings
+    a program collected, it is whether anyone has to open it. A program that
+    merely COPYs the table's copybook has to be rebuilt against the new layout,
+    but its own source is untouched - that is a build-list entry, not a work
+    item, and mixing the two is what makes an impact report unusable.
+    """
+
+    program: str
+    path: str
+    # Copybooks this program includes that a widened field is declared in. The
+    # reason it needs rebuilding at all.
+    changed_copybooks: list[str]
+    # Fields declared in this program's OWN source that must widen, plus any
+    # mention (REFMOD, VALUE, literal comparison) that breaks. Non-empty means
+    # somebody edits this program.
+    own_work: list[str]
+
+    @property
+    def recompile_only(self) -> bool:
+        return bool(self.changed_copybooks) and not self.own_work
+
+    @property
+    def verdict(self) -> str:
+        if self.own_work:
+            return "source change"
+        if self.changed_copybooks:
+            return "recompile only"
+        return "not affected"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "program": self.program,
+            "path": self.path,
+            "verdict": self.verdict,
+            "recompile_only": self.recompile_only,
+            "changed_copybooks": self.changed_copybooks,
+            "own_work": self.own_work,
+        }
+
+
+@dataclass
 class AnalysisResult:
     """Everything a report needs."""
 
@@ -118,6 +191,8 @@ class AnalysisResult:
     paths: dict[str, list[str]]
     warnings: list[str]
     ddl: list[str]
+    # Per-program verdicts, affected programs only, worst first.
+    program_impacts: list[ProgramImpact] = field(default_factory=list)
 
     @property
     def counts(self) -> dict[str, int]:
@@ -162,7 +237,12 @@ class ImpactAnalyzer:
         self.progress.stage(f"collecting findings from {len(required)} affected node(s)")
         findings = self._collect_findings(required, paths, edges_used)
         ddl = self._ddl_plan(required)
-        self.progress.done(f"analysis complete: {len(findings)} finding(s)")
+        impacts = self._program_impacts(required)
+        recompile_only = sum(1 for impact in impacts if impact.recompile_only)
+        self.progress.done(
+            f"analysis complete: {len(findings)} finding(s); {len(impacts)} program(s) "
+            f"affected, {recompile_only} recompile-only"
+        )
         return AnalysisResult(
             spec=self.spec,
             programs=self.programs,
@@ -172,6 +252,7 @@ class ImpactAnalyzer:
             paths=paths,
             warnings=self.warnings,
             ddl=ddl,
+            program_impacts=impacts,
         )
 
     # -- stage 1: parse ---------------------------------------------------
@@ -545,6 +626,16 @@ class ImpactAnalyzer:
         paths: dict[str, list[str]],
         arriving: dict[str, Edge],
     ) -> list[Finding]:
+        """At most one finding per node - which is one per field per program.
+
+        A field mentioned twenty times in one program is one thing to fix, not
+        twenty findings. Every extra mention that matters (a REFMOD with a
+        hard-coded length, a VALUE clause, a literal comparison) is folded into
+        that single finding as an extra note and an extra source reference, and
+        raises its severity if it is worse than the move itself. Nothing is
+        lost; it just stops arriving as separate rows the reader has to
+        reassemble by hand.
+        """
         findings: list[Finding] = []
         seeds = {_column_id(change.table, change.column) for change in self.spec.changes}
         impacted: set[str] = set()
@@ -568,7 +659,7 @@ class ImpactAnalyzer:
             else:
                 findings.append(self._variable_finding(node, need, distance, path, edge))
 
-        findings.extend(self._usage_findings(impacted, required))
+        self._attach_usage_notes(findings, impacted)
         findings.extend(self._unreferenced_findings(seeds))
         findings.sort(key=Finding.sort_key)
         return findings
@@ -692,83 +783,129 @@ class ImpactAnalyzer:
             refs=refs,
         )
 
-    def _usage_findings(
-        self, impacted: set[str], required: dict[str, Capacity]
-    ) -> list[Finding]:
-        """Non-flow mentions of an impacted field that a widening will disturb."""
-        findings: list[Finding] = []
-        category_severity = {
-            "reference-modification": Severity.HIGH,
-            "literal-comparison": Severity.MEDIUM,
-            "inspect": Severity.MEDIUM,
-            "display": Severity.LOW,
-            "file-write": Severity.MEDIUM,
-            "initialize": Severity.LOW,
-            "set": Severity.LOW,
-        }
-        category_advice = {
-            "reference-modification": (
-                "The offset/length is hard-coded and will not follow the new width. "
-                "Recalculate it or replace it with a symbolic length."
-            ),
-            "literal-comparison": (
-                "The literal is padded to the field width. A wider field changes the "
-                "comparison result unless the literal is re-checked."
-            ),
-            "inspect": (
-                "INSPECT scans the entire field including trailing spaces, so counts "
-                "and replacements change when the field grows."
-            ),
-            "display": "Report or log column alignment shifts when the field grows.",
-            "file-write": "The output record grows; downstream readers need the new layout.",
-            "initialize": "Confirm the initialised value still fits the intended semantics.",
-            "set": "Confirm the SET target still matches the new width.",
-        }
+    def _attach_usage_notes(self, findings: list[Finding], impacted: set[str]) -> None:
+        """Fold every other mention of an impacted field into its own finding.
 
+        These are the places a name appears without a width-carrying flow: a
+        REFMOD with a hard-coded length, a literal comparison, an INSPECT, a
+        VALUE clause. Each used to be its own finding, so one field mentioned
+        twenty times produced twenty rows for what is a single edit. They are
+        notes on the field's finding now - the severity rises to the worst of
+        them, and every location is kept as a reference.
+        """
+        by_node: dict[str, Finding] = {}
+        for finding in findings:
+            # A node has exactly one finding by construction, but seeds are
+            # skipped: a column has no COBOL usages to attach.
+            if finding.node_id in impacted:
+                by_node.setdefault(finding.node_id, finding)
+
+        if not by_node:
+            return
+
+        notes: dict[str, list[str]] = {}
         for program in self.programs:
             for usage in program.usages:
                 node_id = self._field_nodes.get((program.name, usage.name))
-                if node_id is None or node_id not in impacted:
+                finding = by_node.get(node_id) if node_id else None
+                if finding is None:
                     continue
-                severity = category_severity.get(usage.category, Severity.LOW)
-                findings.append(
-                    Finding(
-                        severity=severity,
-                        category=usage.category,
-                        node_id=node_id,
-                        title=f"{usage.name} used via {usage.category} in {program.name}",
-                        detail=usage.detail or category_advice.get(usage.category, ""),
-                        current=self.graph.nodes[node_id].capacity.describe(),
-                        required=required[node_id].describe(),
-                        remediation=category_advice.get(usage.category, "Review this usage."),
-                        distance=self._depth.get(node_id, 0),
-                        path=[node_id],
-                        refs=[usage.ref],
-                    )
-                )
+                severity = _USAGE_SEVERITY.get(usage.category, Severity.LOW)
+                if severity.rank < finding.severity.rank:
+                    finding.severity = severity
+                advice = _USAGE_ADVICE.get(usage.category, "Review this usage.")
+                bucket = notes.setdefault(node_id, [])
+                # One note per category, however many times it occurs - the
+                # reader needs to know REFMOD is in play, not that it is in
+                # play eleven times. Every occurrence still gets a reference.
+                label = f"{usage.category}: {advice}"
+                if label not in bucket:
+                    bucket.append(label)
+                if usage.ref not in finding.refs:
+                    finding.refs.append(usage.ref)
 
-        for program in self.programs:
             for key in program.data.order:
                 item = program.data.fields[key]
                 node_id = self._field_nodes.get((program.name, item.name))
-                if node_id is None or node_id not in impacted or not item.value:
+                finding = by_node.get(node_id) if node_id else None
+                if finding is None or not item.value:
                     continue
-                findings.append(
-                    Finding(
-                        severity=Severity.MEDIUM,
-                        category="value-clause",
-                        node_id=node_id,
-                        title=f"{item.name} has a VALUE clause that assumes the old width",
-                        detail=f"Declared with VALUE {item.value}.",
-                        current=item.declaration(),
-                        required=required[node_id].describe(),
-                        remediation="Re-check the initial value against the new field width.",
-                        distance=self._depth.get(node_id, 0),
-                        path=[node_id],
-                        refs=[item.source] if item.source else [],
+                if Severity.MEDIUM.rank < finding.severity.rank:
+                    finding.severity = Severity.MEDIUM
+                label = (
+                    f"value-clause: declared with VALUE {item.value}; re-check the "
+                    "initial value against the new width."
+                )
+                bucket = notes.setdefault(node_id, [])
+                if label not in bucket:
+                    bucket.append(label)
+
+        for node_id, bucket in notes.items():
+            finding = by_node[node_id]
+            finding.detail = " ".join([finding.detail, "Also: " + " | ".join(bucket)]).strip()
+
+    def _program_impacts(self, required: dict[str, Capacity]) -> list[ProgramImpact]:
+        """Classify every affected program as recompile-only or a source change.
+
+        A program has to be rebuilt when a copybook it includes changes - that
+        is what a copybook is. Whether anyone has to EDIT it is a different
+        question, and the answer is no unless a field declared in its own source
+        has to widen, or one of its own statements assumes the old width.
+
+        Fields are attributed by where they are DECLARED (Field.source.path),
+        not by where they are used: a widened field belonging to the table's
+        copybook is the copybook's change, however many programs move it about.
+        """
+        impacts: list[ProgramImpact] = []
+        for program in self.programs:
+            program_path = Path(program.path)
+            changed_copybooks: dict[str, None] = {}
+            own_work: dict[str, None] = {}
+
+            for key in program.data.order:
+                item = program.data.fields[key]
+                if item.level == 88:
+                    continue
+                node_id = self._field_nodes.get((program.name, item.name))
+                if node_id is None:
+                    continue
+                node = self.graph.nodes.get(node_id)
+                need = required.get(node_id)
+                if node is None or need is None or node.capacity.covers(need):
+                    continue
+
+                origin = item.source.path if item.source else ""
+                declared_elsewhere = bool(origin) and Path(origin) != program_path
+                if declared_elsewhere:
+                    changed_copybooks[origin] = None
+                else:
+                    own_work[f"{item.name} must widen ({node.capacity.describe()} -> {need.describe()})"] = None
+
+            # A statement in this program that assumes the old width is an edit
+            # here regardless of where the field itself is declared.
+            for usage in program.usages:
+                node_id = self._field_nodes.get((program.name, usage.name))
+                if node_id is None:
+                    continue
+                node = self.graph.nodes.get(node_id)
+                need = required.get(node_id)
+                if node is None or need is None or node.capacity.covers(need):
+                    continue
+                own_work[f"{usage.name} used via {usage.category}"] = None
+
+            if changed_copybooks or own_work:
+                impacts.append(
+                    ProgramImpact(
+                        program=program.name,
+                        path=program.path,
+                        changed_copybooks=sorted(changed_copybooks),
+                        own_work=sorted(own_work),
                     )
                 )
-        return findings
+
+        # Programs needing real work first; recompile-only is a build list.
+        impacts.sort(key=lambda impact: (impact.recompile_only, impact.program))
+        return impacts
 
     def _unreferenced_findings(self, seeds: set[str]) -> list[Finding]:
         """Changed columns that no scanned program ever touches."""
@@ -823,9 +960,22 @@ class ImpactAnalyzer:
     # -- helpers ------------------------------------------------------------
 
     def _variable_id(self, program: Program, item: Field) -> str:
-        origin = item.source.path if item.source else ""
-        shared = bool(origin) and Path(origin) != Path(program.path)
-        if self.spec.global_variable_scope or shared:
+        """One node per (program, field name).
+
+        A field declared in a copybook used to get a single global node id
+        shared by every program that included it. That is wrong twice over.
+        The storage is not shared - each program compiles its own copy into its
+        own WORKING-STORAGE - so it invented data flows between programs that
+        never call each other: program A moving an amount into a copybook work
+        field, and program B moving that same-named field into a date, became
+        one continuous path from the amount to the date. It also collapsed
+        hundreds of programs onto one node, which is what made propagation
+        crawl.
+
+        --global-variable-scope restores the old behaviour for a shop that
+        really does want every mention of a name treated as one thing.
+        """
+        if self.spec.global_variable_scope:
             return f"var:{item.name}"
         return f"var:{program.name}::{item.name}"
 

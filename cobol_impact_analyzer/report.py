@@ -45,8 +45,13 @@ def to_json(result: AnalysisResult, include_graph: bool = False) -> str:
             "nodes": len(result.graph.nodes),
             "edges": sum(len(edges) for edges in result.graph.out_edges.values()),
             "findings": result.counts,
+            "programs_affected": len(result.program_impacts),
+            "programs_recompile_only": sum(
+                1 for impact in result.program_impacts if impact.recompile_only
+            ),
         },
         "ddl_plan": result.ddl,
+        "program_impacts": [impact.to_dict() for impact in result.program_impacts],
         "findings": [finding.to_dict() for finding in result.findings],
         "programs": [
             {
@@ -165,6 +170,33 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
             lines.append("")
         lines.append("")
 
+    if result.program_impacts:
+        source_change = [i for i in result.program_impacts if not i.recompile_only]
+        recompile = [i for i in result.program_impacts if i.recompile_only]
+
+        lines.append(f"PROGRAMS NEEDING A SOURCE CHANGE ({len(source_change)})")
+        lines.append("-" * 78)
+        if not source_change:
+            lines.append("  none - every affected program only needs rebuilding.")
+        for impact in source_change:
+            lines.append(f"  {impact.program}")
+            for item in impact.own_work:
+                lines.append(f"      {item}")
+            for copybook in impact.changed_copybooks:
+                lines.append(f"      rebuild against : {_short_path(copybook)}")
+        lines.append("")
+
+        lines.append(f"RECOMPILE ONLY ({len(recompile)})")
+        lines.append("-" * 78)
+        lines.append(
+            "  These include a copybook that changes, so they must be rebuilt. "
+            "Nothing in their own source needs editing."
+        )
+        for impact in recompile:
+            books = ", ".join(_short_path(book) for book in impact.changed_copybooks)
+            lines.append(f"  {impact.program:<20} {books}")
+        lines.append("")
+
     if result.ddl:
         lines.append("DDL PLAN")
         lines.append("-" * 78)
@@ -179,6 +211,14 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _short_path(path: str) -> str:
+    """The copybook's own name, which is how a maintainer refers to it."""
+    try:
+        return Path(path).name or path
+    except (ValueError, OSError):
+        return path
 
 
 def _pretty_path(path: Iterable[str]) -> list[str]:
