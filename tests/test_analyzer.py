@@ -235,7 +235,10 @@ class ReportTests(unittest.TestCase):
 
     def test_json_is_valid_and_carries_findings(self):
         payload = json.loads(report.to_json(self.result))
-        self.assertEqual(payload["summary"]["programs_scanned"], 7)
+        self.assertEqual(
+            payload["summary"]["programs_scanned"],
+            len(list((EXAMPLES / "src").glob("*.pco"))),
+        )
         self.assertTrue(payload["findings"])
         self.assertTrue(payload["ddl_plan"])
 
@@ -399,7 +402,8 @@ class ProgramImpactTests(unittest.TestCase):
             if any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks)
         }
         self.assertEqual(
-            includers, {"CUSTUPD", "ORDENTRY", "CUSTLIST", "CUSTPURG", "CUSTARCH"}
+            includers,
+            {"CUSTUPD", "ORDENTRY", "CUSTLIST", "CUSTPURG", "CUSTARCH", "CUSTTBL"},
         )
 
     def test_a_program_with_its_own_widened_field_is_a_source_change(self):
@@ -422,6 +426,40 @@ class ProgramImpactTests(unittest.TestCase):
         self.assertTrue(listed <= scanned)
         result = analyze(_spec(build_change("CUSTOMER", "NEVER_USED", "CHAR(1)", "CHAR(4)")))
         self.assertEqual(result.program_impacts, [])
+
+
+class SubscriptTests(unittest.TestCase):
+    """A subscript is a position, not somewhere the value lands.
+
+    Widened with a NUMBER, not a VARCHAR2, on purpose. An index is numeric, and
+    covers() compares only digit counts when both sides are numeric - so an
+    alphanumeric widening never reached the index and would not have shown this
+    at all. A numeric one hands it the extra digits directly.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = analyze(
+            _spec(build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"))
+        )
+
+    def test_the_table_entry_receiving_the_value_is_reported(self):
+        findings = _find(self.result, "var:CUSTTBL::WS-BAL-ENTRY")
+        self.assertTrue(findings)
+
+    def test_the_index_variable_is_not_reported(self):
+        # MOVE CUST-BALANCE TO WS-BAL-ENTRY(WS-BAL-IDX) used to read WS-BAL-IDX
+        # as a second target, so every index in the shop came back as needing
+        # to grow. No amount of widening a value makes a position bigger.
+        self.assertFalse(_find(self.result, "var:CUSTTBL::WS-BAL-IDX"))
+
+    def test_the_index_is_not_listed_as_work_for_its_program(self):
+        for impact in self.result.program_impacts:
+            if impact.program == "CUSTTBL":
+                self.assertFalse(
+                    [item for item in impact.own_work if "WS-BAL-IDX" in item],
+                    impact.own_work,
+                )
 
 
 class DynamicCallTests(unittest.TestCase):

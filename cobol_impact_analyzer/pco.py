@@ -400,11 +400,44 @@ def identifiers(text: str) -> list[str]:
     return names
 
 
+# A parenthesised group attached to a data name: a subscript, an index, or a
+# reference-modification range. NEW-VALUE(WS-IDX), TOTALS(I, J), FIELD(1:10).
+_SUBSCRIPT_RE = re.compile(rf"({_NAME})\s*\([^()]*\)")
+
+
+def strip_subscripts(text: str) -> str:
+    """Drop what is inside a subscript, keeping the item being subscripted.
+
+    ``MOVE CUST-NAME TO NEW-VALUE(WS-IDX)`` moves data into NEW-VALUE. WS-IDX
+    says WHERE in the table it lands; it is a position, and no amount of
+    widening the value makes the position bigger. Reading it as a second target
+    reported every index variable in the shop as needing to grow.
+
+    It matters more than a stray finding in one place: CALL X USING TBL(IDX)
+    was passing two names for one argument, which shifted every argument after
+    it against the callee's LINKAGE list and quietly compared the wrong pairs.
+
+    Only a group ATTACHED to a name is removed, so arithmetic grouping survives
+    - in ``COMPUTE A = (B + C) * D`` the parenthesis follows an operator, not a
+    data name, and B and C stay. One known cost: FUNCTION LENGTH(WS-X) loses
+    WS-X, which is the right shape anyway, since what flows out of it is a
+    length rather than the widened value.
+    """
+    previous = None
+    current = text or ""
+    # Repeated because a subscript can hold one: TBL(SUB(I)) collapses inside
+    # out, TBL(SUB) then TBL.
+    while current != previous:
+        previous = current
+        current = _SUBSCRIPT_RE.sub(r"\1", current)
+    return current
+
+
 def known_identifiers(program: Program, text: str) -> list[str]:
     """Identifiers that actually resolve to a declared data item."""
     seen: set[str] = set()
     result: list[str] = []
-    for name in identifiers(text):
+    for name in identifiers(strip_subscripts(text)):
         if name in seen:
             continue
         seen.add(name)

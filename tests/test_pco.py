@@ -188,7 +188,13 @@ class ProgramParsingTests(unittest.TestCase):
 
     def test_discover_sources_finds_the_examples(self):
         found = discover_sources([EXAMPLES / "src"], ["*.pco"])
-        self.assertEqual(len(found), 7)
+        # Compared against the directory rather than a hard-coded count, which
+        # broke every time an example was added and told nobody anything when
+        # it did.
+        self.assertEqual(
+            sorted(path.name for path in found),
+            sorted(path.name for path in (EXAMPLES / "src").glob("*.pco")),
+        )
 
 
 if __name__ == "__main__":
