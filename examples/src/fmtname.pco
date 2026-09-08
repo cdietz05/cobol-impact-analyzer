@@ -1,0 +1,24 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FMTNAME.
+      *****************************************************************
+      * CALLED SUBPROGRAM - SQUEEZES A CUSTOMER NAME INTO AN ADDRESS   *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-WORK-NAME             PIC X(30).
+       01  WS-NAME-LEN              PIC S9(4)       COMP.
+       LINKAGE SECTION.
+       01  LK-CUST-NAME             PIC X(30).
+       01  LK-FULL-ADDRESS          PIC X(70).
+       PROCEDURE DIVISION USING LK-CUST-NAME LK-FULL-ADDRESS.
+       0000-MAIN.
+           MOVE LK-CUST-NAME TO WS-WORK-NAME
+           INSPECT WS-WORK-NAME TALLYING WS-NAME-LEN FOR ALL ' '
+           IF WS-WORK-NAME = 'UNKNOWN'
+               MOVE SPACES TO LK-FULL-ADDRESS
+           END-IF
+           STRING WS-WORK-NAME DELIMITED BY SIZE
+                  INTO LK-FULL-ADDRESS
+           END-STRING
+           GOBACK.

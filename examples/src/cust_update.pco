@@ -1,0 +1,63 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUSTUPD.
+      *****************************************************************
+      * READS ONE CUSTOMER, FORMATS A REPORT LINE, WRITES AN AUDIT ROW *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE CUSTOMER END-EXEC.
+       01  WS-SNAPSHOT-NAME         PIC X(30).
+       01  WS-AUDIT-TEXT            PIC X(60).
+           EXEC SQL END DECLARE SECTION END-EXEC.
+           COPY WSCOMMON.
+       01  WS-COUNTERS.
+           05  WS-ROWS-READ         PIC S9(7)       COMP-3.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           PERFORM 1000-GET-CUSTOMER
+           PERFORM 2000-FORMAT-LINE
+           PERFORM 3000-WRITE-AUDIT
+           STOP RUN.
+
+       1000-GET-CUSTOMER.
+           EXEC SQL
+               SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY,
+                      CUST_STATE, CUST_BALANCE
+                 INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY,
+                      :CUST-STATE, :CUST-BALANCE
+                 FROM CUSTOMER
+                WHERE CUST_NAME = :WS-SEARCH-NAME
+           END-EXEC
+           ADD 1 TO WS-ROWS-READ.
+
+       2000-FORMAT-LINE.
+           MOVE CUST-ID          TO RL-CUST-ID
+           MOVE CUST-NAME        TO RL-CUST-NAME
+           MOVE CUST-BALANCE     TO RL-BALANCE
+           STRING CUST-CITY      DELIMITED BY SPACE
+                  ', '           DELIMITED BY SIZE
+                  CUST-STATE     DELIMITED BY SIZE
+                  INTO RL-CITY-STATE
+           END-STRING
+           MOVE CUST-NAME        TO WS-NAME-KEY
+           MOVE CUST-NAME (1:20) TO WS-SNAPSHOT-NAME
+           CALL 'FMTNAME' USING CUST-NAME WS-FULL-ADDRESS.
+
+       3000-WRITE-AUDIT.
+           MOVE CUST-NAME TO WS-AUDIT-TEXT
+           IF CUST-STATUS = 'A'
+               DISPLAY WS-REPORT-LINE
+           END-IF
+           EXEC SQL
+               INSERT INTO ORDER_AUDIT
+                      (AUDIT_CUST_ID, AUDIT_CUST_NAME, AUDIT_TEXT)
+               VALUES (:CUST-ID, :WS-SNAPSHOT-NAME, :WS-AUDIT-TEXT)
+           END-EXEC
+           EXEC SQL
+               UPDATE ORDER_HISTORY
+                  SET CUST_NAME_SNAP = :CUST-NAME
+                WHERE CUST_ID = :CUST-ID
+           END-EXEC.

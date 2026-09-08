@@ -1,0 +1,45 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ORDENTRY.
+      *****************************************************************
+      * CURSOR OVER CUSTOMER/ORDERS, COPIES THE NAME ONTO THE SHIP ROW *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE CUSTOMER END-EXEC.
+           EXEC SQL INCLUDE ORDERREC END-EXEC.
+       01  WS-SHIP-LABEL            PIC X(30).
+       01  WS-INVOICE-KEY           PIC X(40).
+           EXEC SQL END DECLARE SECTION END-EXEC.
+       01  WS-FLAGS.
+           05  WS-EOF-FLAG          PIC X(01)  VALUE 'N'.
+               88  WS-EOF                      VALUE 'Y'.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               DECLARE CUST_CUR CURSOR FOR
+               SELECT C.CUST_ID, C.CUST_NAME, O.ORDER_NBR, O.ORDER_TOTAL
+                 FROM CUSTOMER C, ORDERS O
+                WHERE C.CUST_ID = O.CUST_ID
+                  AND C.CUST_NAME LIKE :WS-INVOICE-KEY
+           END-EXEC
+           EXEC SQL OPEN CUST_CUR END-EXEC
+           PERFORM 1000-FETCH UNTIL WS-EOF
+           EXEC SQL CLOSE CUST_CUR END-EXEC
+           STOP RUN.
+
+       1000-FETCH.
+           EXEC SQL
+               FETCH CUST_CUR
+                INTO :CUST-ID, :CUST-NAME, :ORD-NBR, :ORD-TOTAL
+           END-EXEC
+           MOVE CUST-NAME TO WS-SHIP-LABEL
+           MOVE CUST-NAME TO ORD-SHIP-NAME
+           MOVE CUST-ID   TO ORD-CUST-ID
+           EXEC SQL
+               INSERT INTO ORDER_SHIP
+                      (ORDER_NBR, SHIP_CUST_ID, SHIP_NAME)
+               VALUES (:ORD-NBR, :ORD-CUST-ID, :ORD-SHIP-NAME)
+           END-EXEC.

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cobol-impact-analyzer"
+version = "0.1.0"
+description = "Trace the impact of widening SQL columns through Pro*COBOL (.pco) sources."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+keywords = ["cobol", "pro*cobol", "oracle", "impact-analysis", "mainframe", "copybook"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[project.scripts]
+cobol-impact = "cobol_impact_analyzer.cli:main"
+
+[tool.setuptools]
+packages = ["cobol_impact_analyzer"]
+
+[tool.setuptools.package-data]
+cobol_impact_analyzer = ["py.typed"]

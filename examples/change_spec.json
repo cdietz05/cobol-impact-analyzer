@@ -1,0 +1,18 @@
+{
+  "table": "CUSTOMER",
+  "source_paths": ["src"],
+  "copybook_paths": ["copybooks"],
+  "source_patterns": ["*.pco"],
+  "columns": [
+    {
+      "name": "CUST_NAME",
+      "from": "VARCHAR2(30)",
+      "to": "VARCHAR2(60)"
+    },
+    {
+      "name": "CUST_BALANCE",
+      "from": "NUMBER(11,2)",
+      "to": "NUMBER(13,2)"
+    }
+  ]
+}
