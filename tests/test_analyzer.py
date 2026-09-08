@@ -1,4 +1,5 @@
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -252,8 +253,6 @@ class ReportTests(unittest.TestCase):
 
 class CliTests(unittest.TestCase):
     def test_end_to_end_writes_all_three_formats(self):
-        import tempfile
-
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             code = main(
@@ -267,9 +266,10 @@ class CliTests(unittest.TestCase):
                 ]
             )
             self.assertEqual(code, 0)
-            for name in ("impact.json", "impact.csv", "impact.html"):
+            # Named for the table in the spec, not a fixed "impact".
+            for name in ("CUSTOMER.json", "CUSTOMER.csv", "CUSTOMER.html"):
                 self.assertTrue((out / name).exists(), name)
-            payload = json.loads((out / "impact.json").read_text(encoding="utf-8"))
+            payload = json.loads((out / "CUSTOMER.json").read_text(encoding="utf-8"))
             self.assertTrue(payload["findings"])
 
     def test_inline_arguments_work_without_a_spec_file(self):
@@ -305,6 +305,54 @@ class CliTests(unittest.TestCase):
             ]
         )
         self.assertEqual(code, 1)
+
+
+class OutputNamingTests(unittest.TestCase):
+    def test_one_table_names_the_files_after_it(self):
+        spec = _spec(build_change("CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)"))
+        self.assertEqual(report.output_basename(spec), "CUSTOMER")
+
+    def test_several_tables_are_joined(self):
+        spec = _spec(
+            build_change("CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)"),
+            build_change("ORDER_SHIP", "SHIP_NAME", "VARCHAR2(30)", "VARCHAR2(60)"),
+        )
+        self.assertEqual(report.output_basename(spec), "CUSTOMER_ORDER_SHIP")
+
+    def test_many_tables_say_how_many_rather_than_listing_them(self):
+        spec = _spec(
+            *[
+                build_change(f"TABLE{index}", "COL", "VARCHAR2(30)", "VARCHAR2(60)")
+                for index in range(6)
+            ]
+        )
+        self.assertEqual(report.output_basename(spec), "TABLE0_and_5_more")
+
+    def test_a_schema_qualified_name_does_not_become_an_extension(self):
+        spec = _spec(build_change("SALES.CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)"))
+        self.assertEqual(report.output_basename(spec), "SALES_CUSTOMER")
+
+    def test_out_writes_files_named_for_the_table(self):
+        with tempfile.TemporaryDirectory() as directory:
+            code = main(
+                [
+                    "--spec",
+                    str(EXAMPLES / "change_spec.json"),
+                    "--out",
+                    directory,
+                    "--quiet",
+                    "--no-progress",
+                ]
+            )
+            self.assertEqual(code, 0)
+            written = {path.name for path in Path(directory).iterdir()}
+            self.assertNotIn("impact.json", written)
+            self.assertTrue(
+                any(name.endswith(".html") for name in written), written
+            )
+            stems = {Path(name).stem for name in written}
+            self.assertEqual(len(stems), 1, written)
+            self.assertNotEqual(stems.pop(), "impact")
 
 
 class ProgramImpactTests(unittest.TestCase):

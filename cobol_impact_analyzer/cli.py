@@ -130,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--out",
         type=Path,
         metavar="DIR",
-        help="write impact.json, impact.csv and impact.html into DIR",
+        help="write <TABLE>.json, <TABLE>.csv and <TABLE>.html into DIR",
     )
     out.add_argument(
         "--include-graph",
@@ -222,11 +222,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     targets: list[tuple[str, Path]] = []
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
+        # Named for the table being changed, not "impact": a directory of
+        # impact.json files from six runs is six files nobody can tell apart a
+        # week later.
+        stem = report.output_basename(spec)
         targets.extend(
             [
-                ("json", args.out / "impact.json"),
-                ("csv", args.out / "impact.csv"),
-                ("html", args.out / "impact.html"),
+                ("json", args.out / f"{stem}.json"),
+                ("csv", args.out / f"{stem}.csv"),
+                ("html", args.out / f"{stem}.html"),
             ]
         )
     if args.json:

@@ -5,12 +5,14 @@ from __future__ import annotations
 import csv
 import html
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
 from .analyzer import AnalysisResult
 from .models import Finding, NodeKind, Severity
+from .spec import ChangeSpec
 
 _SEVERITY_ORDER = [
     Severity.CRITICAL,
@@ -215,6 +217,38 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def output_basename(spec: ChangeSpec) -> str:
+    """Filename stem for --out, from the tables being changed.
+
+    A directory of impact.json files from six different runs is six files
+    nobody can tell apart a week later. Naming them for the table means the
+    output says what it is without being opened.
+
+    One table gives its own name; a handful are joined; beyond that the name
+    would be longer than it is useful, so it says how many.
+    """
+    names = [_slug(table) for table in spec.tables]
+    names = [name for name in names if name]
+    if not names:
+        return "impact"
+    if len(names) <= _MAX_TABLES_IN_NAME:
+        return "_".join(names)
+    return f"{names[0]}_and_{len(names) - 1}_more"
+
+
+_MAX_TABLES_IN_NAME = 3
+
+
+def _slug(table: str) -> str:
+    """A table name safe to put in a filename.
+
+    A schema-qualified name carries a dot, which would read as an extension,
+    and shops do put stranger things than that in table names.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9_]+", "_", table).strip("_")
+    return cleaned
 
 
 def _html_notes(notes: Iterable[str]) -> str:
