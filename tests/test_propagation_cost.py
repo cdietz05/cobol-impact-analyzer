@@ -7,6 +7,7 @@ output for an hour.  Both regressions here look like nothing on a small graph
 and dominate a large one.
 """
 
+import collections
 import unittest
 import unittest.mock
 
@@ -50,8 +51,8 @@ class _CountingGraph(ImpactGraph):
         return edges
 
 
-def _hub_analyzer(feeders: int = 50, fanout: int = 50) -> ImpactAnalyzer:
-    """A seed feeding many nodes that all converge on one high-fan-out hub.
+def _hub_analyzer(feeders: int = 50, fanout: int = 50, hubs: int = 1) -> ImpactAnalyzer:
+    """A seed feeding many nodes that all converge on a few high-fan-out hubs.
 
     This is the shape a copybook field takes in a real codebase: _variable_id
     gives any field declared in a copybook a single global node id, so one node
@@ -59,10 +60,10 @@ def _hub_analyzer(feeders: int = 50, fanout: int = 50) -> ImpactAnalyzer:
     all of them at once.
 
     The feeders are deliberately given DECREASING original widths, so each one
-    in turn hands the hub a strictly larger requirement than the last.  That is
-    what makes the hub's requirement grow repeatedly rather than once - and a
-    walk that re-queues a node on every growth then rescans the hub's whole
-    fan-out each time.
+    in turn hands the hubs a strictly larger requirement than the last.  That is
+    what makes a hub's requirement grow repeatedly rather than once - and a walk
+    that re-queues a node on every growth then rescans that hub's whole fan-out
+    each time.
     """
     spec = ChangeSpec(
         changes=[build_change("CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)")],
@@ -75,20 +76,24 @@ def _hub_analyzer(feeders: int = 50, fanout: int = 50) -> ImpactAnalyzer:
     analyzer.graph = graph
 
     graph.add_node(Node(SEED_ID, NodeKind.COLUMN, "CUSTOMER.CUST_NAME", _text(30)))
-    graph.add_node(Node("var:HUB", NodeKind.VARIABLE, "HUB", _text(30)))
+    hub_ids = [f"var:HUB-{index}" for index in range(hubs)]
+    for hub_id in hub_ids:
+        graph.add_node(Node(hub_id, NodeKind.VARIABLE, hub_id, _text(30)))
 
     for index in range(feeders):
         feeder_id = f"var:FEEDER-{index}"
         graph.add_node(Node(feeder_id, NodeKind.VARIABLE, f"FEEDER-{index}", _text(59 - index)))
         graph.add_edge(Edge(SEED_ID, feeder_id, EdgeKind.SQL_FETCH, REF))
-        # STRING is a combining edge: the hub grows by the amount the feeder
-        # grew, which differs per feeder because their originals differ.
-        graph.add_edge(Edge(feeder_id, "var:HUB", EdgeKind.STRING, REF))
+        for hub_id in hub_ids:
+            # STRING is a combining edge: the hub grows by the amount the feeder
+            # grew, which differs per feeder because their originals differ.
+            graph.add_edge(Edge(feeder_id, hub_id, EdgeKind.STRING, REF))
 
     for index in range(fanout):
         leaf_id = f"var:LEAF-{index}"
         graph.add_node(Node(leaf_id, NodeKind.VARIABLE, f"LEAF-{index}", _text(30)))
-        graph.add_edge(Edge("var:HUB", leaf_id, EdgeKind.MOVE, REF))
+        for hub_id in hub_ids:
+            graph.add_edge(Edge(hub_id, leaf_id, EdgeKind.MOVE, REF))
 
     return analyzer
 
@@ -120,10 +125,49 @@ class QueueDedupTests(unittest.TestCase):
 
         # The narrowest feeder (10 chars) grew to 60, a delta of 50, and the
         # hub has to absorb the largest delta any feeder brought it.
-        self.assertEqual(required["var:HUB"].chars, 80)
+        self.assertEqual(required["var:HUB-0"].chars, 80)
         for index in range(50):
             self.assertIn(f"var:LEAF-{index}", required)
             self.assertEqual(required[f"var:LEAF-{index}"].chars, 80)
+
+
+class _RecordingDeque(collections.deque):
+    """A deque that remembers the longest it ever got."""
+
+    max_length = 0
+
+    def append(self, item):
+        super().append(item)
+        type(self).max_length = max(type(self).max_length, len(self))
+
+
+class QueueSizeTests(unittest.TestCase):
+    """The queue must not be able to outgrow the graph.
+
+    This is the failure that was actually observed on a shop corpus: an
+    interrupt landed on ``queue.append`` itself. Appending to a deque is O(1)
+    and cannot be slow on its own - catching the walk there means the process
+    was allocating under memory pressure, which is what an unbounded queue of
+    node ids does to a 400k-node run.
+    """
+
+    def test_the_queue_never_holds_more_entries_than_the_graph_has_nodes(self):
+        # Several hubs, not one: with a single hub each feeder pop removes
+        # itself and adds one entry, so the queue stays level by accident even
+        # when nothing prevents a node from being in it twice. Twenty hubs make
+        # each feeder add twenty, and the duplicates pile up.
+        analyzer = _hub_analyzer(feeders=200, fanout=20, hubs=20)
+        _RecordingDeque.max_length = 0
+        with unittest.mock.patch.object(analyzer_mod, "deque", _RecordingDeque):
+            analyzer._propagate()
+
+        self.assertGreater(_RecordingDeque.max_length, 0, "the fixture queued nothing")
+        self.assertLessEqual(
+            _RecordingDeque.max_length,
+            len(analyzer.graph.nodes),
+            "the queue can hold a node more than once, so its size is not bounded "
+            "by the graph",
+        )
 
 
 class PathReconstructionTests(unittest.TestCase):
@@ -147,7 +191,7 @@ class PathReconstructionTests(unittest.TestCase):
         # A node the walk reached but that is already wide enough never shows a
         # route, because it never becomes a finding.
         analyzer.graph.add_node(Node("var:WIDE", NodeKind.VARIABLE, "WIDE", _text(400)))
-        analyzer.graph.add_edge(Edge("var:HUB", "var:WIDE", EdgeKind.MOVE, REF))
+        analyzer.graph.add_edge(Edge("var:HUB-0", "var:WIDE", EdgeKind.MOVE, REF))
         required, paths, _ = analyzer._propagate()
 
         self.assertIn("var:WIDE", required)
