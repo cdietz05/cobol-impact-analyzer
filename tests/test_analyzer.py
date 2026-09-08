@@ -89,7 +89,16 @@ class PropagationTests(unittest.TestCase):
         # see _attach_usage_notes.
         findings = _find(self.result, "var:CUSTUPD::CUST-NAME")
         self.assertTrue(findings)
-        self.assertIn("reference-modification", findings[0].detail)
+        self.assertTrue(
+            any(note.startswith("reference-modification") for note in findings[0].notes),
+            findings[0].notes,
+        )
+
+    def test_notes_stay_separate_from_the_detail_prose(self):
+        # They were concatenated into detail, which made one cell hundreds of
+        # characters wide and pushed the Where column off the HTML report.
+        for finding in self.result.findings:
+            self.assertNotIn("Also:", finding.detail)
 
     def test_a_field_is_reported_once_per_program_however_often_it_is_used(self):
         for node_id in {finding.node_id for finding in self.result.findings}:

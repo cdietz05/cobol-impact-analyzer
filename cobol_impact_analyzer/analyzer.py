@@ -803,7 +803,6 @@ class ImpactAnalyzer:
         if not by_node:
             return
 
-        notes: dict[str, list[str]] = {}
         for program in self.programs:
             for usage in program.usages:
                 node_id = self._field_nodes.get((program.name, usage.name))
@@ -814,13 +813,12 @@ class ImpactAnalyzer:
                 if severity.rank < finding.severity.rank:
                     finding.severity = severity
                 advice = _USAGE_ADVICE.get(usage.category, "Review this usage.")
-                bucket = notes.setdefault(node_id, [])
                 # One note per category, however many times it occurs - the
                 # reader needs to know REFMOD is in play, not that it is in
                 # play eleven times. Every occurrence still gets a reference.
                 label = f"{usage.category}: {advice}"
-                if label not in bucket:
-                    bucket.append(label)
+                if label not in finding.notes:
+                    finding.notes.append(label)
                 if usage.ref not in finding.refs:
                     finding.refs.append(usage.ref)
 
@@ -836,13 +834,8 @@ class ImpactAnalyzer:
                     f"value-clause: declared with VALUE {item.value}; re-check the "
                     "initial value against the new width."
                 )
-                bucket = notes.setdefault(node_id, [])
-                if label not in bucket:
-                    bucket.append(label)
-
-        for node_id, bucket in notes.items():
-            finding = by_node[node_id]
-            finding.detail = " ".join([finding.detail, "Also: " + " | ".join(bucket)]).strip()
+                if label not in finding.notes:
+                    finding.notes.append(label)
 
     def _program_impacts(self, required: dict[str, Capacity]) -> list[ProgramImpact]:
         """Classify every affected program as recompile-only or a source change.

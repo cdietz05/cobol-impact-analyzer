@@ -403,6 +403,13 @@ class Finding:
     distance: int = 0
     path: list[str] = field(default_factory=list)
     refs: list[SourceRef] = field(default_factory=list)
+    # Other ways this same field is used that the widening disturbs - a REFMOD
+    # with a hard-coded length, a VALUE clause, a literal comparison. Kept as
+    # separate lines rather than concatenated into `detail`, so each renderer
+    # can lay them out: the text report gives them a line each, HTML a list.
+    # Squashing them into one string made a single cell hundreds of characters
+    # wide and pushed everything after it off the page.
+    notes: list[str] = field(default_factory=list)
 
     def sort_key(self) -> tuple[int, int, str]:
         return (self.severity.rank, self.distance, self.node_id)
@@ -414,6 +421,7 @@ class Finding:
             "node": self.node_id,
             "title": self.title,
             "detail": self.detail,
+            "notes": self.notes,
             "current": self.current,
             "required": self.required,
             "remediation": self.remediation,

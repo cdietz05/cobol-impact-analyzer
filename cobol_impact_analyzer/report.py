@@ -88,6 +88,7 @@ _CSV_COLUMNS = [
     "propagation_path",
     "locations",
     "detail",
+    "other_usages",
 ]
 
 
@@ -109,6 +110,7 @@ def write_csv(result: AnalysisResult, path: Path) -> None:
                     "propagation_path": " -> ".join(_pretty_path(finding.path)),
                     "locations": "; ".join(ref.location() for ref in finding.refs),
                     "detail": finding.detail,
+                    "other_usages": "; ".join(finding.notes),
                 }
             )
 
@@ -163,6 +165,8 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
                         where += f"  ({ref.program}"
                         where += f" / {ref.paragraph})" if ref.paragraph else ")"
                     lines.append(f"      at       : {where}")
+            for note in finding.notes:
+                lines.append(f"      also     : {note}")
             if len(finding.path) > 1:
                 lines.append(f"      path     : {' -> '.join(_pretty_path(finding.path))}")
             if verbose and finding.detail:
@@ -211,6 +215,11 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
         lines.append("")
 
     return "\n".join(lines)
+
+
+def _html_notes(notes: Iterable[str]) -> str:
+    items = "".join(f"<li>{html.escape(note)}</li>" for note in notes)
+    return f"<ul class='notes'>{items}</ul>" if items else ""
 
 
 def _short_path(path: str) -> str:
@@ -263,7 +272,11 @@ body {
   color: var(--ink);
   font: 14px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
 }
-main { max-width: 1180px; margin: 0 auto; }
+/* Wide on purpose. The impacts table carries six columns, two of which hold
+   file paths and propagation routes that are long by nature; at 1180px the
+   last column ("Where") was the one that lost, and a reader who cannot see
+   where a finding lives cannot act on it. */
+main { max-width: 1600px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
 h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em;
      color: var(--muted); margin: 36px 0 12px; }
@@ -290,6 +303,22 @@ code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
          font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
 .path { color: var(--muted); font-size: 12px; }
 .loc { color: var(--accent); font-size: 12px; }
+/* Long identifiers and paths have no spaces to break at, so without this a
+   single PROG::FIELD-NAME or a deep source path stretches its column and
+   squeezes every other one. */
+.mono, .loc, .path { overflow-wrap: anywhere; }
+/* The impacts table's own column budget. "What" is the flexible column and
+   will happily eat the table if left alone - the notes and the propagation
+   route both live there. Capping it keeps "Action" and "Where" readable. */
+table.impacts { table-layout: fixed; }
+table.impacts th:nth-child(1), table.impacts td:nth-child(1) { width: 84px; }
+table.impacts th:nth-child(2), table.impacts td:nth-child(2) { width: 40%; }
+table.impacts th:nth-child(3), table.impacts td:nth-child(3) { width: 130px; }
+table.impacts th:nth-child(4), table.impacts td:nth-child(4) { width: 130px; }
+table.impacts th:nth-child(5), table.impacts td:nth-child(5) { width: 22%; }
+table.impacts th:nth-child(6), table.impacts td:nth-child(6) { width: 18%; min-width: 200px; }
+ul.notes { margin: 4px 0 0; padding-left: 16px; color: var(--muted); font-size: 12px; }
+ul.notes li { margin: 2px 0; }
 ul.plain { list-style: none; padding: 0; margin: 0; }
 ul.plain li { padding: 5px 0; border-bottom: 1px solid var(--line); }
 ul.plain li:last-child { border-bottom: none; }
@@ -337,7 +366,7 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
     if not result.findings:
         parts.append("<div class='panel'>No impacts found for this change.</div>")
     else:
-        parts.append("<div class='scroll'><table>")
+        parts.append("<div class='scroll'><table class='impacts'>")
         parts.append(
             "<tr><th>Sev</th><th>What</th><th>Now</th><th>Needs</th>"
             "<th>Action</th><th>Where</th></tr>"
@@ -359,7 +388,8 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
                 f"<td><strong>{html.escape(finding.title)}</strong>"
                 f"<div class='path'>{html.escape(finding.category)} &middot; "
                 f"{finding.distance} hop(s) from the change</div>"
-                f"<div class='path'>{html.escape(finding.detail)}</div>{path}</td>"
+                f"<div class='path'>{html.escape(finding.detail)}</div>"
+                f"{_html_notes(finding.notes)}{path}</td>"
                 f"<td class='mono'>{html.escape(finding.current)}</td>"
                 f"<td class='mono'>{html.escape(finding.required)}</td>"
                 f"<td class='mono'>{html.escape(finding.remediation)}</td>"
