@@ -49,6 +49,13 @@ _COMBINING = frozenset(
 # because they share physical storage.
 _LAYOUT = frozenset({EdgeKind.GROUP_PARENT, EdgeKind.REDEFINES})
 
+# The propagation guard: at most this many edge relaxations per run, or this
+# multiple of the edge count, whichever is larger. Both are named constants so a
+# test can lower them rather than having to build a fixture big enough to trip
+# the real cap.
+_MIN_RELAXATION_BUDGET = 200_000
+_RELAXATION_BUDGET_FACTOR = 20
+
 
 @dataclass
 class ImpactGraph:
@@ -394,33 +401,61 @@ class ImpactAnalyzer:
 
     def _propagate(self) -> tuple[dict[str, Capacity], dict[str, list[str]], dict[str, Edge]]:
         required: dict[str, Capacity] = {}
-        paths: dict[str, list[str]] = {}
+        # How each node was first reached, as a single parent pointer rather
+        # than a copy of the whole route. Building the full list at every
+        # relaxation is quadratic in path depth and allocates a fresh list per
+        # step - on a real shop corpus (400k nodes, 1M edges) that alone is
+        # most of the run time, and it retains a list per affected node on top.
+        # Routes are reconstructed once at the end, only for the nodes that
+        # actually become findings.
+        parents: dict[str, str] = {}
         depth: dict[str, int] = {}
         arriving: dict[str, Edge] = {}
         queue: deque[str] = deque()
+        # Nodes already waiting to be walked. A node's requirement can grow
+        # several times before it is popped, and without this every growth
+        # queued another full rescan of its successors. That is harmless on a
+        # toy graph and catastrophic on a real one, where copybook fields
+        # become hub nodes shared by hundreds of programs: each rescan walks
+        # the hub's entire fan-out again. Deduping loses nothing, because a
+        # pop always reads the latest merged requirement.
+        queued: set[str] = set()
 
         for change in self.spec.changes:
             node_id = _column_id(change.table, change.column)
             required[node_id] = change.new_capacity
-            paths[node_id] = [node_id]
             depth[node_id] = 0
             queue.append(node_id)
+            queued.add(node_id)
 
         limit = self.spec.max_depth or 0
+        total_edges = sum(len(edges) for edges in self.graph.out_edges.values())
         # Propagation converges because requirements only ever grow toward a
         # finite bound, but a malformed source should not be able to hang a
         # batch job, so the walk is also capped.
-        budget = max(10_000, 50 * (len(self.graph.nodes) + 1))
-        while queue:
-            budget -= 1
-            if budget <= 0:
-                self.warnings.append(
-                    "propagation stopped early after "
-                    f"{max(10_000, 50 * (len(self.graph.nodes) + 1))} steps; "
-                    "the result may be incomplete"
-                )
-                break
+        #
+        # Counted in edge relaxations, not queue pops: a pop costs as much as
+        # the node has successors, so a pop budget bounds nothing at all when
+        # one hub node carries tens of thousands of edges.
+        budget = max(_MIN_RELAXATION_BUDGET, _RELAXATION_BUDGET_FACTOR * total_edges)
+        relaxations = 0
+        processed = 0
+        exhausted = False
+
+        while queue and not exhausted:
             node_id = queue.popleft()
+            queued.discard(node_id)
+            processed += 1
+            # The report only prints at the very end, so without a heartbeat
+            # this phase is indistinguishable from a hang. The total is an
+            # estimate that moves as the frontier grows - honest, and enough
+            # to show the walk is still making progress.
+            if processed % 256 == 0:
+                self.progress.step(
+                    processed,
+                    processed + len(queue),
+                    f"{len(required)} node(s) affected",
+                )
             node = self.graph.nodes.get(node_id)
             if node is None:
                 continue
@@ -430,6 +465,16 @@ class ImpactAnalyzer:
             source_current = node.capacity
             source_required = required[node_id]
             for edge in self.graph.successors(node_id):
+                relaxations += 1
+                if relaxations > budget:
+                    message = (
+                        f"propagation stopped early after {budget} edge relaxations; "
+                        "the result may be incomplete"
+                    )
+                    self.warnings.append(message)
+                    self.progress.warn(message)
+                    exhausted = True
+                    break
                 target = self.graph.nodes.get(edge.target_id)
                 if target is None:
                     continue
@@ -447,13 +492,50 @@ class ImpactAnalyzer:
                     continue
                 merged = previous.grown_to_hold(candidate) if previous else candidate
                 required[edge.target_id] = merged
-                paths[edge.target_id] = paths.get(node_id, [node_id]) + [edge.target_id]
+                parents[edge.target_id] = node_id
                 depth[edge.target_id] = current_depth + 1
                 arriving[edge.target_id] = edge
-                queue.append(edge.target_id)
+                if edge.target_id not in queued:
+                    queue.append(edge.target_id)
+                    queued.add(edge.target_id)
 
+        self.progress.step(processed, processed, f"{len(required)} node(s) affected")
         self._depth = depth
-        return required, paths, arriving
+        return required, self._reconstruct_paths(required, parents), arriving
+
+    def _reconstruct_paths(
+        self, required: dict[str, Capacity], parents: dict[str, str]
+    ) -> dict[str, list[str]]:
+        """Walk parent pointers back to the seed, for reported nodes only.
+
+        Every node the walk touched lands in ``required``, but only the ones
+        whose own capacity cannot hold what arrived become findings - which is
+        the only place a route is ever shown. Anything skipped here degrades to
+        a single-element path at the call site, which is never read.
+        """
+        seeds = {_column_id(change.table, change.column) for change in self.spec.changes}
+        paths: dict[str, list[str]] = {}
+        for node_id, need in required.items():
+            node = self.graph.nodes.get(node_id)
+            if node is None:
+                continue
+            if node_id not in seeds and node.capacity.covers(need):
+                continue
+            route = [node_id]
+            # A cycle in the parent pointers is not expected, but REDEFINES and
+            # CALL argument edges are bidirectional and this must not be the
+            # thing that hangs after the expensive part already finished.
+            seen = {node_id}
+            current = node_id
+            while current in parents:
+                current = parents[current]
+                if current in seen:
+                    break
+                seen.add(current)
+                route.append(current)
+            route.reverse()
+            paths[node_id] = route
+        return paths
 
     # -- stage 4: findings -------------------------------------------------
 
