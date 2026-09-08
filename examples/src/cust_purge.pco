@@ -1,0 +1,22 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUSTPURG.
+      *****************************************************************
+      * INCLUDES THE CUSTOMER COPYBOOK BUT NEVER TOUCHES CUST_NAME.    *
+      * NOTHING FLOWS INTO OR OUT OF THE WIDENED FIELD HERE - YET THE  *
+      * COPYBOOK THIS PROGRAM COMPILES AGAINST STILL CHANGES SHAPE, SO *
+      * IT STILL HAS TO BE REBUILT. THAT IS THE WHOLE POINT OF THE     *
+      * RECOMPILE-ONLY LIST.                                           *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CUSTOMER END-EXEC.
+       01  WS-PURGE-COUNT           PIC S9(9)       COMP-3.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               DELETE FROM CUSTOMER
+                WHERE CUST_STATUS = 'X'
+           END-EXEC
+           ADD 1 TO WS-PURGE-COUNT
+           GOBACK.

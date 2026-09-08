@@ -856,10 +856,31 @@ class ImpactAnalyzer:
         not by where they are used: a widened field belonging to the table's
         copybook is the copybook's change, however many programs move it about.
         """
+        # Which copybook FILES change, across the whole scan. A copybook is a
+        # shared declaration: the moment one program's flow widens a field
+        # declared in it, that file changes shape for every program that
+        # includes it - including programs where nothing flows through the
+        # field at all. Those still have to be rebuilt, and they are the ones
+        # most likely to be forgotten, because nothing in them looks different.
+        changed_files: set[Path] = set()
+        for program in self.programs:
+            program_path = Path(program.path)
+            for key in program.data.order:
+                item = program.data.fields[key]
+                if item.level == 88 or not item.source:
+                    continue
+                node_id = self._field_nodes.get((program.name, item.name))
+                node = self.graph.nodes.get(node_id) if node_id else None
+                need = required.get(node_id) if node_id else None
+                if node is None or need is None or node.capacity.covers(need):
+                    continue
+                origin = Path(item.source.path)
+                if origin != program_path:
+                    changed_files.add(origin)
+
         impacts: list[ProgramImpact] = []
         for program in self.programs:
             program_path = Path(program.path)
-            changed_copybooks: dict[str, None] = {}
             own_work: dict[str, None] = {}
 
             for key in program.data.order:
@@ -875,10 +896,8 @@ class ImpactAnalyzer:
                     continue
 
                 origin = item.source.path if item.source else ""
-                declared_elsewhere = bool(origin) and Path(origin) != program_path
-                if declared_elsewhere:
-                    changed_copybooks[origin] = None
-                else:
+                declared_here = not origin or Path(origin) == program_path
+                if declared_here:
                     own_work[f"{item.name} must widen ({node.capacity.describe()} -> {need.describe()})"] = None
 
             # A statement in this program that assumes the old width is an edit
@@ -893,12 +912,16 @@ class ImpactAnalyzer:
                     continue
                 own_work[f"{usage.name} used via {usage.category}"] = None
 
-            if changed_copybooks or own_work:
+            included_and_changed = sorted(
+                {book for book in program.copybooks if Path(book) in changed_files}
+            )
+
+            if included_and_changed or own_work:
                 impacts.append(
                     ProgramImpact(
                         program=program.name,
                         path=program.path,
-                        changed_copybooks=sorted(changed_copybooks),
+                        changed_copybooks=included_and_changed,
                         own_work=sorted(own_work),
                     )
                 )

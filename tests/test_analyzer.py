@@ -225,7 +225,7 @@ class ReportTests(unittest.TestCase):
 
     def test_json_is_valid_and_carries_findings(self):
         payload = json.loads(report.to_json(self.result))
-        self.assertEqual(payload["summary"]["programs_scanned"], 4)
+        self.assertEqual(payload["summary"]["programs_scanned"], 5)
         self.assertTrue(payload["findings"])
         self.assertTrue(payload["ddl_plan"])
 
@@ -320,6 +320,28 @@ class ProgramImpactTests(unittest.TestCase):
         self.assertEqual(impact.verdict, "recompile only")
         self.assertEqual(impact.own_work, [])
         self.assertTrue(any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks))
+
+    def test_a_program_that_never_touches_the_field_is_still_rebuilt(self):
+        # CUSTPURG includes CUSTOMER.cpy and only ever DELETEs. Nothing flows
+        # through CUST-NAME here, so per-program scoping finds no impacted node
+        # in it at all - but the copybook it compiles against still changes
+        # shape, so it still has to be rebuilt. These are the programs most
+        # likely to be missed, because nothing in them looks different.
+        impact = self._impact("CUSTPURG")
+        self.assertTrue(impact.recompile_only)
+        self.assertEqual(impact.own_work, [])
+        self.assertTrue(any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks))
+
+    def test_a_copybook_changed_by_one_program_is_changed_for_all_of_them(self):
+        # The widening reaches CUST-NAME through CUSTUPD and ORDENTRY. That
+        # makes CUSTOMER.cpy a changed file for every includer, not only for
+        # the programs the flow happened to pass through.
+        includers = {
+            impact.program
+            for impact in self.result.program_impacts
+            if any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks)
+        }
+        self.assertEqual(includers, {"CUSTUPD", "ORDENTRY", "CUSTLIST", "CUSTPURG"})
 
     def test_a_program_with_its_own_widened_field_is_a_source_change(self):
         impact = self._impact("CUSTUPD")
