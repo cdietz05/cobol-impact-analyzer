@@ -1,0 +1,23 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. IOCUSTNM.
+      *****************************************************************
+      * IO MODULE - THE ONLY PLACE CUST_ARCHIVE IS EVER WRITTEN.       *
+      * IT IS NEVER CALLED BY NAME: CALLERS MOVE THE PROGRAM NAME INTO *
+      * A VARIABLE AND CALL THAT. WITHOUT RESOLVING THAT INDIRECTION,  *
+      * NOTHING REACHES LK-IO-NAME AND CUST_ARCHIVE.ARCH_NAME IS NEVER *
+      * REPORTED - EVEN THOUGH IT TAKES THE WIDENED VALUE DIRECTLY.    *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-IO-STATUS             PIC S9(4)       COMP.
+       LINKAGE SECTION.
+       01  LK-IO-NAME               PIC X(30).
+       PROCEDURE DIVISION USING LK-IO-NAME.
+       0000-MAIN.
+           EXEC SQL
+               INSERT INTO CUST_ARCHIVE (ARCH_NAME)
+               VALUES (:LK-IO-NAME)
+           END-EXEC
+           MOVE SQLCODE TO WS-IO-STATUS
+           GOBACK.

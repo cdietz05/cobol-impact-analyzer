@@ -234,7 +234,7 @@ class ReportTests(unittest.TestCase):
 
     def test_json_is_valid_and_carries_findings(self):
         payload = json.loads(report.to_json(self.result))
-        self.assertEqual(payload["summary"]["programs_scanned"], 5)
+        self.assertEqual(payload["summary"]["programs_scanned"], 7)
         self.assertTrue(payload["findings"])
         self.assertTrue(payload["ddl_plan"])
 
@@ -350,7 +350,9 @@ class ProgramImpactTests(unittest.TestCase):
             for impact in self.result.program_impacts
             if any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks)
         }
-        self.assertEqual(includers, {"CUSTUPD", "ORDENTRY", "CUSTLIST", "CUSTPURG"})
+        self.assertEqual(
+            includers, {"CUSTUPD", "ORDENTRY", "CUSTLIST", "CUSTPURG", "CUSTARCH"}
+        )
 
     def test_a_program_with_its_own_widened_field_is_a_source_change(self):
         impact = self._impact("CUSTUPD")
@@ -372,6 +374,39 @@ class ProgramImpactTests(unittest.TestCase):
         self.assertTrue(listed <= scanned)
         result = analyze(_spec(build_change("CUSTOMER", "NEVER_USED", "CHAR(1)", "CHAR(4)")))
         self.assertEqual(result.program_impacts, [])
+
+
+class DynamicCallTests(unittest.TestCase):
+    """CALL WS-PGM-NAME, resolved through the literals moved into it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _run_name_widening()
+
+    def test_the_widened_value_reaches_the_called_modules_linkage(self):
+        # CUSTARCH does MOVE 'IOCUSTNM' TO WS-PGM-NAME then CALL WS-PGM-NAME.
+        # Without resolving that, the call is a dead end and nothing downstream
+        # of it is ever reported.
+        self.assertTrue(_find(self.result, "var:IOCUSTNM::LK-IO-NAME"))
+
+    def test_a_table_only_written_by_the_io_module_is_reported(self):
+        # The whole point: CUST_ARCHIVE is never named in the calling program,
+        # only in the IO module the caller reaches indirectly.
+        findings = _find(self.result, "col:CUST_ARCHIVE.ARCH_NAME")
+        self.assertTrue(findings)
+        self.assertIn("VARCHAR2(60)", findings[0].remediation)
+
+    def test_the_route_names_the_program_the_variable_resolved_to(self):
+        findings = _find(self.result, "var:IOCUSTNM::LK-IO-NAME")
+        trail = findings[0].path
+        self.assertIn("col:CUSTOMER.CUST_NAME", trail)
+        self.assertIn("var:CUSTARCH::WS-ARCH-NAME", trail)
+
+    def test_an_unresolvable_dynamic_call_says_why(self):
+        warnings = "\n".join(self.result.warnings)
+        # Every dynamic call in the examples resolves, so the bare "no literal
+        # was ever moved into it" wording must not be firing spuriously.
+        self.assertNotIn("no literal program name was ever moved into it", warnings)
 
 
 class VariableScopeTests(unittest.TestCase):

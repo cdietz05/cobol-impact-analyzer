@@ -453,30 +453,77 @@ class ImpactAnalyzer:
         by_name = {program.name: program for program in self.programs}
         for program in self.programs:
             for call in program.calls:
-                callee = by_name.get(call.target)
-                if callee is None:
+                callees = self._call_targets(program, call, by_name)
+                if not callees:
                     if call.args:
-                        self.warnings.append(
-                            f"{call.ref.location()}: called program {call.target} is outside the "
-                            "scan scope; its parameter widths cannot be checked"
-                        )
+                        self.warnings.append(self._unresolved_call_warning(program, call))
                     continue
-                for position, argument in enumerate(call.args):
-                    if position >= len(callee.linkage_using):
-                        continue
-                    caller_id = self._field_nodes.get((program.name, argument))
-                    callee_id = self._field_nodes.get(
-                        (callee.name, callee.linkage_using[position])
-                    )
-                    if not caller_id or not callee_id:
-                        continue
-                    note = f"argument {position + 1} of CALL {call.target}"
-                    self.graph.add_edge(
-                        Edge(caller_id, callee_id, EdgeKind.CALL_ARG, call.ref, note)
-                    )
-                    self.graph.add_edge(
-                        Edge(callee_id, caller_id, EdgeKind.CALL_ARG, call.ref, note)
-                    )
+                for callee in callees:
+                    label = call.target if not call.dynamic else f"{call.target} -> {callee.name}"
+                    for position, argument in enumerate(call.args):
+                        if position >= len(callee.linkage_using):
+                            continue
+                        caller_id = self._field_nodes.get((program.name, argument))
+                        callee_id = self._field_nodes.get(
+                            (callee.name, callee.linkage_using[position])
+                        )
+                        if not caller_id or not callee_id:
+                            continue
+                        note = f"argument {position + 1} of CALL {label}"
+                        self.graph.add_edge(
+                            Edge(caller_id, callee_id, EdgeKind.CALL_ARG, call.ref, note)
+                        )
+                        self.graph.add_edge(
+                            Edge(callee_id, caller_id, EdgeKind.CALL_ARG, call.ref, note)
+                        )
+
+    def _call_targets(
+        self, program: Program, call: CallSite, by_name: dict[str, Program]
+    ) -> list[Program]:
+        """Which scanned programs this CALL can reach.
+
+        A literal target resolves to one program or none. An identifier target
+        (``CALL WS-PGM-NAME``) names a variable, so it resolves through every
+        literal ever assigned to that variable - by MOVE or by VALUE clause.
+        That covers the way a great many shops reach their IO modules, and
+        without it every such call is a dead end: the widened value stops at
+        the caller and never reaches the called module's LINKAGE at all.
+
+        Where a variable carries several program names, edges are built to ALL
+        of them. Which one runs depends on data this tool cannot see, so the
+        honest answer is every one it could be - over-reporting a call that
+        might not happen is recoverable, missing a truncation is not.
+        """
+        direct = by_name.get(call.target)
+        if direct is not None:
+            return [direct]
+        if not call.dynamic:
+            return []
+        resolved: list[Program] = []
+        for literal in program.literal_moves.get(call.target, []):
+            candidate = by_name.get(literal)
+            if candidate is not None and candidate not in resolved:
+                resolved.append(candidate)
+        return resolved
+
+    def _unresolved_call_warning(self, program: Program, call: CallSite) -> str:
+        where = call.ref.location()
+        if not call.dynamic:
+            return (
+                f"{where}: called program {call.target} is outside the scan scope; "
+                "its parameter widths cannot be checked"
+            )
+        literals = program.literal_moves.get(call.target, [])
+        if not literals:
+            return (
+                f"{where}: CALL {call.target} names a variable and no literal program "
+                "name was ever moved into it, so the called program cannot be "
+                "identified; its parameter widths cannot be checked"
+            )
+        return (
+            f"{where}: CALL {call.target} resolves to {', '.join(literals)}, none of "
+            "which were scanned; their parameter widths cannot be checked"
+        )
 
     # -- stage 3: propagate -----------------------------------------------
 

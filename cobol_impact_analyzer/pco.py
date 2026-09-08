@@ -99,6 +99,11 @@ class CallSite:
     target: str
     args: list[str]
     ref: SourceRef
+    # True when the target was written as an identifier rather than a literal
+    # (``CALL WS-PGM-NAME``). The target is then the name of a variable, not of
+    # a program, and has to be resolved through whatever literals were moved
+    # into it - see Program.literal_moves.
+    dynamic: bool = False
 
 
 @dataclass
@@ -115,6 +120,13 @@ class Program:
     linkage_using: list[str] = field(default_factory=list)
     copybooks: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # Literals ever assigned to a variable, by variable name - from a MOVE of a
+    # literal and from a VALUE clause on the declaration. Exists solely to
+    # resolve ``CALL WS-PGM-NAME``, which is how a great many shops call their
+    # IO modules: MOVE 'IOCUST01' TO WS-PGM-NAME, then CALL WS-PGM-NAME. With
+    # no way to resolve that, every such call is a dead end and the widened
+    # value never reaches the called module's LINKAGE at all.
+    literal_moves: dict[str, list[str]] = field(default_factory=dict)
 
     def knows(self, name: str) -> bool:
         return self.data.get(name) is not None
@@ -192,6 +204,15 @@ class ProgramParser:
         inline = cb.parse_data_sentences(data_sentences, origin=str(path), program=name)
         program.data.merge(inline)
         cb.finalize(program.data)
+
+        # A program name held in a VALUE clause rather than moved in at run
+        # time - 01 WS-PGM-NAME PIC X(8) VALUE 'IOCUST01' - is the other half
+        # of the same pattern, and has to be seeded before the statements are
+        # read so a CALL on it resolves.
+        for key in program.data.order:
+            item = program.data.fields[key]
+            if item.value:
+                _remember_literal(program, item.name, _quoted_literal(item.value))
 
         for sentence, paragraph in procedure_sentences:
             self._procedure(program, sentence, paragraph)
@@ -403,6 +424,31 @@ def _split_on_keyword(text: str, keyword: str) -> tuple[str, str]:
 # -- statement handlers ---------------------------------------------------
 
 
+_QUOTED_RE = re.compile(r"'((?:[^']|'')*)'|\"((?:[^\"]|\"\")*)\"")
+
+# A program name is short, and one variable holding more than a handful of
+# distinct literals is a flag or a message, not a program name. The cap keeps a
+# pathological source from growing this map without bound.
+_MAX_LITERALS_PER_NAME = 16
+
+
+def _quoted_literal(text: str) -> str:
+    """The first quoted literal in ``text``, uppercased, or "" if there is none."""
+    match = _QUOTED_RE.search(text or "")
+    if not match:
+        return ""
+    value = match.group(1) if match.group(1) is not None else match.group(2)
+    return (value or "").replace("''", "'").replace('""', '"').strip().upper()
+
+
+def _remember_literal(program: Program, name: str, literal: str) -> None:
+    if not literal:
+        return
+    bucket = program.literal_moves.setdefault(name.upper(), [])
+    if literal not in bucket and len(bucket) < _MAX_LITERALS_PER_NAME:
+        bucket.append(literal)
+
+
 def _handle_move(program: Program, chunk: str, ref: SourceRef) -> None:
     body = re.sub(r"^\s*MOVE\s+", "", chunk, flags=re.I)
     corresponding = bool(re.match(r"\s*(CORR|CORRESPONDING)\b", body, re.I))
@@ -418,6 +464,13 @@ def _handle_move(program: Program, chunk: str, ref: SourceRef) -> None:
         _move_corresponding(program, sources, targets, ref)
         return
     note = "" if sources else "literal or figurative constant source"
+    if not sources:
+        # MOVE 'IOCUST01' TO WS-PGM-NAME. Worth remembering only because a
+        # later CALL WS-PGM-NAME is otherwise unresolvable.
+        literal = _quoted_literal(source_text)
+        if literal:
+            for target in targets:
+                _remember_literal(program, target, literal)
     for target in targets:
         program.flows.append(
             Flow(
@@ -598,15 +651,17 @@ def _handle_call(program: Program, chunk: str, ref: SourceRef) -> None:
     match = re.match(rf"\s*CALL\s+('(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|{_NAME})", chunk, re.I)
     if not match:
         return
-    target = match.group(1).strip("'\"").upper()
+    raw = match.group(1).strip()
+    dynamic = raw[:1] not in ("'", '"')
+    target = raw.strip("'\"").upper()
     _, using_text = _split_on_keyword(chunk, "USING")
     if not using_text:
-        program.calls.append(CallSite(target=target, args=[], ref=ref))
+        program.calls.append(CallSite(target=target, args=[], ref=ref, dynamic=dynamic))
         return
     using_text, _ = _split_on_keyword(using_text, "RETURNING")
     using_text, _ = _split_on_keyword(using_text, "ON")
     args = known_identifiers(program, using_text)
-    program.calls.append(CallSite(target=target, args=args, ref=ref))
+    program.calls.append(CallSite(target=target, args=args, ref=ref, dynamic=dynamic))
 
 
 def _handle_write(program: Program, chunk: str, ref: SourceRef) -> None:

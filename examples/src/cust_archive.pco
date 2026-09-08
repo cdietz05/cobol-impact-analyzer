@@ -1,0 +1,26 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUSTARCH.
+      *****************************************************************
+      * CALLS THE IO MODULE THE WAY MOST SHOPS DO - BY MOVING THE      *
+      * PROGRAM NAME INTO A VARIABLE AND CALLING THE VARIABLE. THE     *
+      * WIDENED NAME REACHES CUST_ARCHIVE ONLY IF THAT INDIRECTION IS  *
+      * RESOLVED.                                                      *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CUSTOMER END-EXEC.
+       01  WS-PGM-NAME              PIC X(08).
+       01  WS-ARCH-NAME             PIC X(30).
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT CUST_NAME
+                 INTO :CUST-NAME
+                 FROM CUSTOMER
+                WHERE CUST_ID = :CUST-ID
+           END-EXEC
+           MOVE CUST-NAME TO WS-ARCH-NAME
+           MOVE 'IOCUSTNM' TO WS-PGM-NAME
+           CALL WS-PGM-NAME USING WS-ARCH-NAME
+           GOBACK.
