@@ -33,6 +33,30 @@ class PictureTests(unittest.TestCase):
         self.assertEqual(parse_picture("S9(9)", "COMP").storage_bytes, 4)
         self.assertEqual(parse_picture("S9(18)", "COMP").storage_bytes, 8)
 
+    def test_index_and_pointer_carry_a_size_but_no_numeric_capacity(self):
+        # An INDEX item is a subscript and a POINTER is a machine address.
+        # Modelling either as a 15-digit signed number made every one of them
+        # look like a huge value pouring into whatever field it touched, and
+        # reported a truncation that cannot happen.
+        for usage in ("INDEX", "POINTER"):
+            info = parse_picture("", usage)
+            self.assertIs(info.capacity.kind, Kind.UNKNOWN, usage)
+            self.assertEqual(info.capacity.int_digits, 0, usage)
+            self.assertGreater(info.storage_bytes, 0, f"{usage} still occupies storage")
+
+    def test_an_unparseable_picture_does_not_inherit_a_usage_capacity(self):
+        # _usage_only is also the fallback for a PICTURE the parser cannot
+        # consume. It must not turn one of those into a confident number.
+        for usage in ("DISPLAY", "COMP-3", "INDEX", "POINTER"):
+            self.assertIs(parse_picture("()", usage).capacity.kind, Kind.UNKNOWN, usage)
+
+    def test_floating_point_items_keep_their_significand(self):
+        # COMP-1/COMP-2 do hold numbers, and a MOVE into a smaller field really
+        # can lose precision, so these keep a digit count.
+        self.assertEqual(parse_picture("", "COMP-1").capacity.int_digits, 7)
+        self.assertEqual(parse_picture("", "COMP-2").capacity.int_digits, 15)
+        self.assertEqual(parse_picture("", "COMP-2").storage_bytes, 8)
+
     def test_usage_synonyms(self):
         self.assertEqual(parse_picture("S9(5)", "PACKED-DECIMAL").storage_bytes, 3)
         self.assertEqual(parse_picture("S9(5)", "COMPUTATIONAL-3").storage_bytes, 3)

@@ -210,19 +210,44 @@ def _pure_edit_positions(body: str) -> int:
     return total
 
 
+# Items with no PICTURE whose size the USAGE clause fixes on its own. Only the
+# floating-point ones carry a decimal capacity: COMP-1 and COMP-2 hold numbers,
+# and their significand is what a MOVE into a smaller field would truncate.
+#
+# INDEX and POINTER are here for their byte count ONLY. An INDEX item is a
+# subscript and a POINTER is a machine address; neither holds a decimal quantity
+# and neither participates in the arithmetic MOVEs this tool reasons about.
+# Giving them a numeric capacity made every one of them look like a 15-digit
+# signed number pouring into whatever it touched, and reported a truncation that
+# cannot happen - and it was also the silent fallback for any PICTURE the parser
+# failed to consume on such a field. Unknown is the honest answer, and covers()
+# already treats unknown as "cannot prove a problem".
+_USAGE_ONLY_BYTES = {"COMP-1": 4, "COMP-2": 8, "INDEX": 4, "POINTER": 8}
+# Significant decimal digits in an IEEE single/double significand. Approximate
+# by nature - these are binary floats, not fixed-point decimals - so they size
+# the value without claiming an exact digit count.
+_FLOAT_DIGITS = {"COMP-1": 7, "COMP-2": 15}
+
+
 def _usage_only(raw: str, usage: str) -> PictureInfo:
     """Items that carry no PICTURE, e.g. ``COMP-1``, ``INDEX``, group items."""
-    sizes = {"COMP-1": 4, "COMP-2": 8, "INDEX": 4, "POINTER": 8}
-    if usage in sizes:
-        digits = 7 if usage == "COMP-1" else 15
-        return PictureInfo(
-            raw=raw,
-            usage=usage,
-            capacity=Capacity(kind=Kind.NUMERIC, int_digits=digits, dec_digits=0, signed=True),
-            storage_bytes=sizes[usage],
-            display_size=sizes[usage],
-        )
-    return PictureInfo(raw=raw, usage=usage, capacity=Capacity(), storage_bytes=0, display_size=0)
+    size = _USAGE_ONLY_BYTES.get(usage)
+    if size is None:
+        return PictureInfo(raw=raw, usage=usage, capacity=Capacity(), storage_bytes=0, display_size=0)
+
+    digits = _FLOAT_DIGITS.get(usage)
+    capacity = (
+        Capacity(kind=Kind.NUMERIC, int_digits=digits, dec_digits=0, signed=True)
+        if digits is not None
+        else Capacity()
+    )
+    return PictureInfo(
+        raw=raw,
+        usage=usage,
+        capacity=capacity,
+        storage_bytes=size,
+        display_size=size,
+    )
 
 
 def _binary_bytes(digits: int) -> int:
