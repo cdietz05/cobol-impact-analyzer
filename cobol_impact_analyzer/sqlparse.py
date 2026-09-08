@@ -248,10 +248,25 @@ def columns_in_expression(expr: str, aliases: dict[str, str], default_table: str
 
 
 class SqlAnalyzer:
-    """Parses EXEC SQL blocks, remembering cursor declarations along the way."""
+    """Parses EXEC SQL blocks, remembering cursor declarations along the way.
 
-    def __init__(self) -> None:
+    Cursor names are scoped to one program. Shops reuse names like ``C1`` and
+    ``CUR1`` in every program in the shop, so a shared namespace would let one
+    program's ``DECLARE`` silently supply the column mapping for another
+    program's ``FETCH`` — inventing findings, or worse, mapping a fetch to the
+    wrong table entirely.
+
+    ``shared_cursors`` is a deliberate second chance for the real case where a
+    cursor genuinely is declared elsewhere (a copybook, or a program parsed
+    later). Resolving through it always records a warning, because it is a guess
+    rather than a fact.
+    """
+
+    def __init__(self, shared_cursors: Optional[dict[str, SqlStatement]] = None) -> None:
         self.cursors: dict[str, SqlStatement] = {}
+        self.shared_cursors: dict[str, SqlStatement] = (
+            shared_cursors if shared_cursors is not None else {}
+        )
 
     def parse(self, raw: str, ref: SourceRef) -> SqlStatement:
         text = normalize(raw)
@@ -301,7 +316,29 @@ class SqlAnalyzer:
         statement.cursor = name
         statement.text = text
         self.cursors[name] = statement
+        self.shared_cursors[name] = statement
         return statement
+
+    def _cursor_declaration(
+        self, cursor: str, statement: SqlStatement
+    ) -> Optional[SqlStatement]:
+        """This program's declaration, else a borrowed one with a warning."""
+        declaration = self.cursors.get(cursor)
+        if declaration is not None:
+            return declaration
+        borrowed = self.shared_cursors.get(cursor)
+        if borrowed is None:
+            statement.unresolved.append(
+                f"cursor {cursor} is not declared in any scanned source; "
+                "its columns cannot be mapped"
+            )
+            return None
+        origin = borrowed.ref.program or borrowed.ref.path or "another program"
+        statement.unresolved.append(
+            f"cursor {cursor} is not declared in this program; its column mapping "
+            f"was borrowed from {origin} — confirm they are the same cursor"
+        )
+        return borrowed
 
     def _parse_select(self, text: str, ref: SourceRef) -> SqlStatement:
         statement = SqlStatement(kind="SELECT", text=text, ref=ref)
@@ -484,13 +521,12 @@ class SqlAnalyzer:
         match = re.match(rf"FETCH\s+({_IDENT})", text, re.I)
         cursor = match.group(1).upper() if match else ""
         statement.cursor = cursor
-        declaration = self.cursors.get(cursor)
+        declaration = self._cursor_declaration(cursor, statement)
         into_index = find_keyword(text, "INTO")
         if into_index == -1:
             return statement
         pairs = _host_var_pairs(text[into_index + 4 :])
         if declaration is None:
-            statement.unresolved.append(f"cursor {cursor} declared outside the scanned sources")
             for host, indicator in pairs:
                 statement.bindings.append(
                     Binding(host_var=host, direction=Direction.OUT, indicator=indicator)
@@ -524,7 +560,7 @@ class SqlAnalyzer:
         match = re.match(rf"OPEN\s+({_IDENT})", text, re.I)
         cursor = match.group(1).upper() if match else ""
         statement.cursor = cursor
-        declaration = self.cursors.get(cursor)
+        declaration = self._cursor_declaration(cursor, statement)
         if declaration is not None:
             statement.tables = list(declaration.tables)
             # USING host variables feed the cursor's WHERE clause predicates.

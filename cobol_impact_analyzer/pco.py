@@ -125,9 +125,15 @@ class ProgramParser:
 
     def __init__(self, resolver: Optional[CopybookResolver] = None) -> None:
         self.resolver = resolver
-        self.sql_analyzer = SqlAnalyzer()
+        # Cursors declared anywhere in the scan, consulted only when a program
+        # fetches a cursor it does not declare itself.
+        self.shared_cursors: dict[str, SqlStatement] = {}
+        self.sql_analyzer = SqlAnalyzer(self.shared_cursors)
 
     def parse(self, path: Path, source_format: str | None = None) -> Program:
+        # A fresh analyzer per program keeps cursor names program-scoped; reused
+        # names like C1 would otherwise cross-contaminate column mappings.
+        self.sql_analyzer = SqlAnalyzer(self.shared_cursors)
         lines = cobolsrc.read_lines(path, source_format)
         name = _program_id(lines) or path.stem.upper()
         program = Program(name=name, path=str(path))

@@ -62,6 +62,61 @@ class SqlParsingTests(unittest.TestCase):
         pairs = {(b.table, b.column, b.host_var) for b in fetch.bindings}
         self.assertIn(("CUSTOMER", "CUST_NAME", "B"), pairs)
 
+    def test_cursor_names_are_scoped_to_one_program(self):
+        # Two analyzers sharing a registry stand in for two programs.
+        shared: dict = {}
+        first = SqlAnalyzer(shared)
+        first.parse(
+            "DECLARE C1 CURSOR FOR SELECT CUST_NAME FROM CUSTOMER", self.ref
+        )
+        second = SqlAnalyzer(shared)
+        second.parse("DECLARE C1 CURSOR FOR SELECT VEND_NAME FROM VENDOR", self.ref)
+        fetch = second.parse("FETCH C1 INTO :WS-A", self.ref)
+        self.assertEqual(fetch.bindings[0].table, "VENDOR")
+        self.assertEqual(fetch.bindings[0].column, "VEND_NAME")
+        self.assertFalse(fetch.unresolved)
+
+    def test_borrowing_a_cursor_from_another_program_is_flagged(self):
+        shared: dict = {}
+        declarer = SqlAnalyzer(shared)
+        declarer.parse("DECLARE C1 CURSOR FOR SELECT CUST_NAME FROM CUSTOMER", self.ref)
+
+        other = SqlAnalyzer(shared)
+        fetch = other.parse("FETCH C1 INTO :WS-Z", self.ref)
+        # The mapping is still offered, because a copybook-declared cursor is a
+        # real pattern -- but never silently.
+        self.assertEqual(fetch.bindings[0].column, "CUST_NAME")
+        self.assertTrue(any("borrowed" in note for note in fetch.unresolved))
+
+    def test_an_entirely_unknown_cursor_is_reported(self):
+        analyzer = SqlAnalyzer()
+        fetch = analyzer.parse("FETCH NOWHERE INTO :WS-A", self.ref)
+        self.assertTrue(any("not declared in any scanned source" in n for n in fetch.unresolved))
+        # The host variable is still recorded, just without a column.
+        self.assertEqual(fetch.bindings[0].host_var, "WS-A")
+        self.assertEqual(fetch.bindings[0].column, "")
+
+    def test_open_using_a_borrowed_cursor_is_flagged_too(self):
+        shared: dict = {}
+        SqlAnalyzer(shared).parse(
+            "DECLARE C1 CURSOR FOR SELECT CUST_NAME FROM CUSTOMER WHERE CUST_ID = :WS-ID",
+            self.ref,
+        )
+        opened = SqlAnalyzer(shared).parse("OPEN C1", self.ref)
+        self.assertTrue(any("borrowed" in note for note in opened.unresolved))
+
+    def test_cursor_with_for_update_still_parses_its_select_list(self):
+        analyzer = SqlAnalyzer()
+        analyzer.parse(
+            "DECLARE C1 CURSOR FOR SELECT CUST_NAME, CUST_CITY FROM CUSTOMER "
+            "WHERE CUST_ID > :WS-LOW ORDER BY CUST_NAME FOR UPDATE",
+            self.ref,
+        )
+        fetch = analyzer.parse("FETCH C1 INTO :A, :B", self.ref)
+        pairs = {(b.column, b.host_var) for b in fetch.bindings}
+        self.assertIn(("CUST_NAME", "A"), pairs)
+        self.assertIn(("CUST_CITY", "B"), pairs)
+
     def test_indicator_variables_are_kept_separate(self):
         statement = self.analyzer.parse(
             "SELECT CUST_NAME INTO :CUST-NAME:IND-NAME FROM CUSTOMER", self.ref

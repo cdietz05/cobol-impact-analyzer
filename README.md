@@ -162,6 +162,38 @@ variable, or moves data into it from one that is. A table copybook whose fields
 are never referenced individually in SQL produces no findings — which is exactly
 the case in the next paragraph.
 
+### Cursors
+
+`DECLARE ... CURSOR FOR SELECT`, `OPEN`, `FETCH ... INTO` and `CLOSE` are all
+handled. The cursor's select list is remembered at declaration and applied
+positionally to every `FETCH INTO` against it, so this traces exactly as if the
+columns were named at the fetch:
+
+```cobol
+EXEC SQL
+    DECLARE CUST_CUR CURSOR FOR
+    SELECT C.CUST_ID, C.CUST_NAME FROM CUSTOMER C
+END-EXEC
+...
+EXEC SQL FETCH CUST_CUR INTO :CUST-ID, :CUST-NAME END-EXEC
+```
+
+`CUSTOMER.CUST_NAME` binds to `CUST-NAME` through the declaration. Table aliases
+(`C.CUST_NAME`), `WHERE` predicates on the declaration, `ORDER BY` and
+`FOR UPDATE` tails are all handled.
+
+**Cursor names are scoped to one program.** Shops reuse `C1` and `CUR1` across
+hundreds of programs, so a shared namespace would let one program's `DECLARE`
+supply the mapping for another program's `FETCH` — inventing findings, or
+mapping a fetch to the wrong table. When a program fetches a cursor it does not
+declare (a genuine pattern when the `DECLARE` lives in a copybook), the mapping
+is still offered, but a warning names the program it was borrowed from so you
+can confirm they are the same cursor. A cursor declared nowhere in the scan is
+reported and its columns are left unmapped rather than guessed.
+
+Not handled: `FETCH ... USING DESCRIPTOR` and anything else built through
+`PREPARE`/`EXECUTE`, which is dynamic by definition.
+
 ### The group-host-variable blind spot
 
 Some shops bind a whole record at once:
