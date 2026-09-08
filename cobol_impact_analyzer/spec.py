@@ -23,6 +23,7 @@ class ChangeSpec:
     source_paths: list[Path] = field(default_factory=list)
     copybook_paths: list[Path] = field(default_factory=list)
     source_patterns: list[str] = field(default_factory=lambda: ["*.pco"])
+    copybook_suffixes: list[str] = field(default_factory=list)
     source_format: Optional[str] = None
     max_depth: int = 0  # 0 means unlimited
     global_variable_scope: bool = False
@@ -41,6 +42,7 @@ class ChangeSpec:
             "source_paths": [str(path) for path in self.source_paths],
             "copybook_paths": [str(path) for path in self.copybook_paths],
             "source_patterns": self.source_patterns,
+            "copybook_suffixes": self.copybook_suffixes,
             "max_depth": self.max_depth,
         }
 
@@ -119,6 +121,12 @@ def load_spec(path: Path) -> ChangeSpec:
     patterns = raw.get("source_patterns")
     if patterns:
         spec.source_patterns = [str(pattern) for pattern in patterns]
+    suffixes = raw.get("copybook_suffixes")
+    if suffixes:
+        spec.copybook_suffixes = [
+            suffix if suffix.startswith(".") or suffix == "" else f".{suffix}"
+            for suffix in (str(value).lower() for value in suffixes)
+        ]
     source_format = raw.get("source_format")
     if source_format:
         spec.source_format = str(source_format).lower()

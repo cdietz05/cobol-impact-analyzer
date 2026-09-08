@@ -10,6 +10,7 @@ from typing import Optional, Sequence
 from . import report
 from .analyzer import analyze
 from .models import Severity
+from .progress import Progress
 from .spec import ChangeSpec, SpecError, build_change, load_spec
 
 _EXIT_OK = 0
@@ -89,6 +90,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="source filename pattern (default: *.pco and *.PCO)",
     )
     scan.add_argument(
+        "--copybook-ext",
+        action="append",
+        default=[],
+        metavar="EXT",
+        help=(
+            "extension to treat as a copybook when indexing, e.g. --copybook-ext .cpb; "
+            "repeatable. Defaults cover .cpy/.cbl/.cob/.inc/.copy/.cpb/.cbk/.src and "
+            "extensionless files"
+        ),
+    )
+    scan.add_argument(
         "--format",
         dest="source_format",
         choices=["fixed", "free"],
@@ -126,6 +138,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="embed the full data-flow graph in the JSON output",
     )
     out.add_argument("--quiet", action="store_true", help="suppress the terminal report")
+    out.add_argument(
+        "--no-progress",
+        action="store_true",
+        help=(
+            "suppress the progress lines on stderr; they are on by default because a "
+            "large scan is otherwise silent for minutes"
+        ),
+    )
     out.add_argument("--verbose", action="store_true", help="include the reasoning per finding")
     out.add_argument(
         "--fail-on",
@@ -164,6 +184,11 @@ def _spec_from_args(args: argparse.Namespace) -> ChangeSpec:
         spec.source_patterns = list(args.pattern)
     elif spec.source_patterns == ["*.pco"]:
         spec.source_patterns = ["*.pco", "*.PCO"]
+    if args.copybook_ext:
+        spec.copybook_suffixes = [
+            ext if ext.startswith(".") or ext == "" else f".{ext}"
+            for ext in (value.lower() for value in args.copybook_ext)
+        ]
     if args.source_format:
         spec.source_format = args.source_format
     if args.max_depth:
@@ -189,7 +214,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         parser.error(str(error))
         return _EXIT_USAGE
 
-    result = analyze(spec)
+    result = analyze(spec, Progress(enabled=not args.no_progress))
 
     if not args.quiet:
         sys.stdout.write(report.to_text(result, verbose=args.verbose))

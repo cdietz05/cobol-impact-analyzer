@@ -174,6 +174,7 @@ class CliTests(unittest.TestCase):
                     "--out",
                     str(out),
                     "--quiet",
+                    "--no-progress",
                 ]
             )
             self.assertEqual(code, 0)
@@ -198,6 +199,7 @@ class CliTests(unittest.TestCase):
                 "--copybook",
                 str(EXAMPLES / "copybooks"),
                 "--quiet",
+                "--no-progress",
             ]
         )
         self.assertEqual(code, 0)
@@ -208,6 +210,7 @@ class CliTests(unittest.TestCase):
                 "--spec",
                 str(EXAMPLES / "change_spec.json"),
                 "--quiet",
+                "--no-progress",
                 "--fail-on",
                 "CRITICAL",
             ]

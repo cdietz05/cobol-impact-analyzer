@@ -189,6 +189,37 @@ worse is found.
 
 ---
 
+## Watching a long run
+
+The report is only printed once the whole analysis finishes, so a large scan
+would otherwise sit silent for minutes. Progress goes to **stderr**, on by
+default, and adapts to where it is pointed — a terminal gets one line rewritten
+in place, a log file gets a line every couple of seconds:
+
+```
+[00:00] discovering sources matching *.pco, *.PCO under /code/pco
+[00:03] parsing 1847 source file(s)
+[00:05] indexing copybooks under /code/copylib
+[00:07] indexed 2310 copybook name(s)
+[00:41] 1847/1847  .../code/pco/billing/bl9920.pco
+[00:41] building the data-flow graph
+[00:42] graph built: 48192 nodes, 91043 edges
+[00:43] analysis complete: 214 finding(s)
+```
+
+Because stdout carries only the report, `... > impact.txt` still gives you a
+clean file while progress stays on your terminal. `--no-progress` turns it off.
+
+Notice the copybook index is built *after* parsing starts — it is lazy, and
+scoped to plausible copybook extensions rather than every file under the search
+path. If your shop uses an extension outside
+`.cpy .cbl .cob .inc .copy .cpb .cbk .src` (or extensionless members), add it
+with `--copybook-ext`. A name that misses the filtered index triggers one
+unfiltered fallback scan rather than failing, so an unusual extension still
+resolves — you just pay for the walk once.
+
+---
+
 ## Output
 
 - **stdout** — grouped by severity, with the propagation path and source
@@ -214,6 +245,7 @@ worse is found.
 --source PATH              source directory or file (repeatable)
 --copybook PATH            copybook directory (repeatable)
 --pattern GLOB             source filename pattern (default *.pco and *.PCO)
+--copybook-ext EXT         extra extension to index as a copybook (repeatable)
 --format {fixed,free}      force source format instead of auto-detecting
 --max-depth N              stop propagating after N hops
 --global-vars              merge same-named inline fields across programs
@@ -224,6 +256,7 @@ worse is found.
 --out DIR                  write impact.json, impact.csv and impact.html
 --include-graph            embed the data-flow graph in the JSON
 --quiet                    suppress the terminal report
+--no-progress              suppress the stderr progress lines
 --verbose                  include the reasoning per finding
 --fail-on {CRITICAL,HIGH,MEDIUM,LOW,INFO,NONE}
 ```

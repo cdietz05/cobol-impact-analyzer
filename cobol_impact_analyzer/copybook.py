@@ -7,15 +7,18 @@ precompiler has run.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 from . import cobolsrc
+from . import progress as progress_mod
 from .cobolsrc import LogicalLine, Sentence, normalize_name
 from .models import Capacity, Field, Kind, SourceRef
 from .picture import normalize_usage, parse_picture
+from .progress import Progress
 
 # COBOL names may contain hyphens, so "\b" is not enough to isolate a keyword:
 # it happily matches COMP inside WS-COMP-CODE. These guards demand that no name
@@ -56,7 +59,19 @@ _REPLACING_PAIR_RE = re.compile(
     re.I | re.DOTALL,
 )
 
-_COPYBOOK_SUFFIXES = (".cpy", ".cbl", ".cob", ".inc", ".copy", ".cpb", ".CPY", "")
+# Extensions that plausibly hold a copybook. The empty string keeps
+# extensionless members, which mainframe-derived trees are full of.
+_COPYBOOK_SUFFIXES = (".cpy", ".cbl", ".cob", ".inc", ".copy", ".cpb", ".cbk", ".src", "")
+
+# Directories never worth walking when looking for a copybook.
+_PRUNED_DIRS = frozenset(
+    {
+        ".git", ".svn", ".hg", ".bzr", "CVS",
+        "node_modules", "__pycache__", ".mypy_cache", ".pytest_cache",
+        ".idea", ".vscode", ".venv", "venv",
+        "target", "build", "dist", ".gradle",
+    }
+)
 
 
 @dataclass
@@ -98,33 +113,93 @@ class DataMap:
 
 
 class CopybookResolver:
-    """Finds copybook files on a search path, the way a precompiler would."""
+    """Finds copybook files on a search path, the way a precompiler would.
 
-    def __init__(self, search_paths: Sequence[Path]) -> None:
+    The index is built once, lazily, on the first lookup — and only over files
+    that could plausibly be copybooks. Walking every file under a shop's source
+    tree up front costs minutes on a network filesystem before a single program
+    is parsed, which is pure waste when the run may not need a copybook at all.
+
+    If a name misses the filtered index, one full unfiltered scan runs as a
+    fallback, so an unusual extension still resolves rather than silently
+    failing. That fallback happens at most once per resolver.
+    """
+
+    def __init__(
+        self,
+        search_paths: Sequence[Path],
+        suffixes: Optional[Iterable[str]] = None,
+        progress: Optional[Progress] = None,
+    ) -> None:
         self.search_paths = [Path(path) for path in search_paths]
-        self._index: dict[str, Path] = {}
-        self._build_index()
-
-    def _build_index(self) -> None:
-        for base in self.search_paths:
-            if not base.exists():
-                continue
-            for path in sorted(base.rglob("*")):
-                if not path.is_file():
-                    continue
-                stem = path.stem.upper()
-                self._index.setdefault(stem, path)
-                self._index.setdefault(path.name.upper(), path)
+        self.suffixes = frozenset(
+            suffix.lower() for suffix in (suffixes if suffixes is not None else _COPYBOOK_SUFFIXES)
+        )
+        self.progress = progress_mod.resolve(progress)
+        self._index: Optional[dict[str, Path]] = None
+        self._fallback_index: Optional[dict[str, Path]] = None
+        self._cache: dict[str, Optional[Path]] = {}
+        self.files_indexed = 0
 
     def resolve(self, name: str) -> Optional[Path]:
         key = name.strip().strip("'\"").upper()
-        if key in self._index:
-            return self._index[key]
-        for suffix in _COPYBOOK_SUFFIXES:
-            candidate = self._index.get(f"{key}{suffix.upper()}")
-            if candidate:
+        if key in self._cache:
+            return self._cache[key]
+        found = self._lookup(key, self._ensure_index())
+        if found is None:
+            found = self._lookup(key, self._ensure_fallback())
+        self._cache[key] = found
+        return found
+
+    def _lookup(self, key: str, index: dict[str, Path]) -> Optional[Path]:
+        candidate = index.get(key)
+        if candidate is not None:
+            return candidate
+        for suffix in sorted(self.suffixes):
+            if not suffix:
+                continue
+            candidate = index.get(f"{key}{suffix.upper()}")
+            if candidate is not None:
                 return candidate
         return None
+
+    def _ensure_index(self) -> dict[str, Path]:
+        if self._index is None:
+            self.progress.stage(
+                "indexing copybooks under "
+                + ", ".join(str(path) for path in self.search_paths)
+            )
+            self._index = self._scan(self._is_candidate)
+            self.files_indexed = len(self._index)
+            self.progress.stage(f"indexed {len(self._index)} copybook name(s)")
+        return self._index
+
+    def _ensure_fallback(self) -> dict[str, Path]:
+        if self._fallback_index is None:
+            self.progress.stage(
+                "a copybook was not found by extension; scanning all files once"
+            )
+            self._fallback_index = self._scan(lambda _path: True)
+        return self._fallback_index
+
+    def _is_candidate(self, path: Path) -> bool:
+        return path.suffix.lower() in self.suffixes
+
+    def _scan(self, accept) -> dict[str, Path]:
+        index: dict[str, Path] = {}
+        for base in self.search_paths:
+            if not base.exists():
+                continue
+            for root, dirs, files in os.walk(base):
+                # Pruning in place is what makes os.walk cheaper than rglob.
+                dirs[:] = sorted(name for name in dirs if name not in _PRUNED_DIRS)
+                for filename in sorted(files):
+                    path = Path(root) / filename
+                    if not accept(path):
+                        continue
+                    index.setdefault(path.stem.upper(), path)
+                    index.setdefault(path.name.upper(), path)
+        return index
 
 
 def parse_data_sentences(

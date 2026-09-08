@@ -10,15 +10,19 @@ it in the report.
 
 from __future__ import annotations
 
+import fnmatch
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 from . import cobolsrc, copybook as cb
+from . import progress as progress_mod
 from .cobolsrc import LogicalLine, normalize_name
-from .copybook import CopybookResolver, DataMap
+from .copybook import _PRUNED_DIRS, CopybookResolver, DataMap
 from .models import EdgeKind, SourceRef
+from .progress import Progress
 from .sqlparse import SqlAnalyzer, SqlStatement
 
 _NAME = r"[A-Za-z][A-Za-z0-9_\-]*"
@@ -753,21 +757,38 @@ def _record_refmods(program: Program, chunk: str, ref: SourceRef) -> None:
 def discover_sources(
     roots: Sequence[Path],
     patterns: Sequence[str] = ("*.pco", "*.PCO"),
+    progress: Optional[Progress] = None,
 ) -> list[Path]:
-    """Every source file under ``roots`` matching any of ``patterns``."""
+    """Every source file under ``roots`` matching any of ``patterns``.
+
+    Uses one pruned walk per root rather than one ``rglob`` per pattern, so
+    adding patterns costs nothing and version-control directories are skipped.
+    """
+    reporter = progress_mod.resolve(progress)
     found: list[Path] = []
     seen: set[Path] = set()
     for root in roots:
         root = Path(root)
         if root.is_file():
-            if root.resolve() not in seen:
-                seen.add(root.resolve())
+            resolved = root.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
                 found.append(root)
             continue
-        for pattern in patterns:
-            for path in root.rglob(pattern):
+        if not root.exists():
+            reporter.warn(f"source path does not exist: {root}")
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = sorted(name for name in dirnames if name not in _PRUNED_DIRS)
+            for filename in sorted(filenames):
+                if not any(fnmatch.fnmatch(filename, pattern) for pattern in patterns):
+                    continue
+                path = Path(dirpath) / filename
                 resolved = path.resolve()
-                if path.is_file() and resolved not in seen:
-                    seen.add(resolved)
-                    found.append(path)
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                found.append(path)
+                if len(found) % 500 == 0:
+                    reporter.stage(f"discovered {len(found)} source files so far")
     return sorted(found)

@@ -18,6 +18,7 @@ from __future__ import annotations
 from .analyzer import AnalysisResult, ImpactAnalyzer, ImpactGraph, analyze
 from .models import Capacity, ColumnChange, EdgeKind, Finding, Kind, Severity
 from .picture import PictureInfo, parse_picture, render_picture
+from .progress import NullProgress, Progress
 from .report import to_html, to_json, to_text, write_csv, write_html, write_json
 from .spec import ChangeSpec, SpecError, build_change, load_spec
 from .sqltypes import SqlType, parse_sql_type
@@ -34,7 +35,9 @@ __all__ = [
     "ImpactAnalyzer",
     "ImpactGraph",
     "Kind",
+    "NullProgress",
     "PictureInfo",
+    "Progress",
     "Severity",
     "SpecError",
     "SqlType",

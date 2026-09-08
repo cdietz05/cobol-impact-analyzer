@@ -21,7 +21,9 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from . import picture
+from . import progress as progress_mod
 from .copybook import CopybookResolver
+from .progress import Progress
 from .models import (
     Capacity,
     ColumnChange,
@@ -121,8 +123,9 @@ class AnalysisResult:
 class ImpactAnalyzer:
     """Runs one analysis end to end."""
 
-    def __init__(self, spec: ChangeSpec) -> None:
+    def __init__(self, spec: ChangeSpec, progress: Optional[Progress] = None) -> None:
         self.spec = spec
+        self.progress = progress_mod.resolve(progress)
         self.graph = ImpactGraph()
         self.programs: list[Program] = []
         self.warnings: list[str] = []
@@ -138,10 +141,18 @@ class ImpactAnalyzer:
 
     def run(self) -> AnalysisResult:
         self._parse_sources()
+        self.progress.stage("building the data-flow graph")
         self._build_graph()
+        self.progress.stage(
+            f"graph built: {len(self.graph.nodes)} nodes, "
+            f"{sum(len(edges) for edges in self.graph.out_edges.values())} edges"
+        )
+        self.progress.stage("propagating widths")
         required, paths, edges_used = self._propagate()
+        self.progress.stage(f"collecting findings from {len(required)} affected node(s)")
         findings = self._collect_findings(required, paths, edges_used)
         ddl = self._ddl_plan(required)
+        self.progress.done(f"analysis complete: {len(findings)} finding(s)")
         return AnalysisResult(
             spec=self.spec,
             programs=self.programs,
@@ -156,16 +167,30 @@ class ImpactAnalyzer:
     # -- stage 1: parse ---------------------------------------------------
 
     def _parse_sources(self) -> None:
-        resolver = CopybookResolver(self.spec.copybook_paths)
+        resolver = CopybookResolver(
+            self.spec.copybook_paths,
+            suffixes=self.spec.copybook_suffixes or None,
+            progress=self.progress,
+        )
         parser = ProgramParser(resolver)
-        sources = discover_sources(self.spec.source_paths, self.spec.source_patterns)
+        self.progress.stage(
+            "discovering sources matching "
+            f"{', '.join(self.spec.source_patterns)} under "
+            + ", ".join(str(path) for path in self.spec.source_paths)
+        )
+        sources = discover_sources(
+            self.spec.source_paths, self.spec.source_patterns, self.progress
+        )
         if not sources:
             self.warnings.append(
                 "no source files matched "
                 f"{', '.join(self.spec.source_patterns)} under "
                 f"{', '.join(str(path) for path in self.spec.source_paths) or '(no paths given)'}"
             )
-        for path in sources:
+        self.progress.stage(f"parsing {len(sources)} source file(s)")
+        total = len(sources)
+        for index, path in enumerate(sources, start=1):
+            self.progress.step(index, total, str(path))
             try:
                 program = parser.parse(path, self.spec.source_format)
             except OSError as error:
@@ -774,7 +799,7 @@ def _redeclare(declaration: str, old_picture: str, new_picture: str) -> str:
     return f"{declaration.rstrip('.')} -> PIC {new_picture}."
 
 
-def analyze(spec: ChangeSpec) -> AnalysisResult:
+def analyze(spec: ChangeSpec, progress: Optional[Progress] = None) -> AnalysisResult:
     """Convenience wrapper around :class:`ImpactAnalyzer`."""
-    return ImpactAnalyzer(spec).run()
+    return ImpactAnalyzer(spec, progress).run()
 
