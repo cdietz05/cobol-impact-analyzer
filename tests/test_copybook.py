@@ -80,6 +80,28 @@ class CopybookParsingTests(unittest.TestCase):
         self.assertEqual(data.get("WS-FLAGS").storage_bytes, 1)
         self.assertEqual(data.get("WS-EOF").level, 88)
 
+    def test_ibm_name_characters_are_accepted(self):
+        # "#", "@" and "$" are legal in IBM COBOL user-defined words.
+        data = _parse(
+            "       01  CU01TB01-REC.\n"
+            "           05  CUST#NAME    PIC X(30).\n"
+            "           05  CUST@ID      PIC S9(9)  COMP-3.\n"
+        )
+        self.assertEqual(data.get("CUST#NAME").capacity.chars, 30)
+        self.assertEqual(data.get("CUST@ID").usage, "COMP-3")
+        self.assertEqual(len(data.get("CU01TB01-REC").children), 2)
+
+    def test_filler_keys_cannot_collide_with_a_real_hash_name(self):
+        data = _parse(
+            "       01  REC.\n"
+            "           05  FILLER   PIC X(2).\n"
+            "           05  A#1      PIC X(3).\n"
+        )
+        # The synthetic FILLER key uses "!", which is not legal in a COBOL word.
+        self.assertIsNotNone(data.get("A#1"))
+        self.assertEqual(data.get("A#1").capacity.chars, 3)
+        self.assertEqual(data.get("REC").storage_bytes, 5)
+
     def test_qualified_names(self):
         data = _parse(
             "       01  REC.\n"

@@ -1,4 +1,4 @@
-"""Pro*COBOL program parsing: declarations, embedded SQL, and data flow.
+﻿"""Pro*COBOL program parsing: declarations, embedded SQL, and data flow.
 
 This module answers "what moves where" for one ``.pco`` (or plain ``.cbl``)
 program.  It is deliberately a *pattern* parser rather than a full COBOL grammar:
@@ -25,16 +25,16 @@ from .models import EdgeKind, SourceRef
 from .progress import Progress
 from .sqlparse import SqlAnalyzer, SqlStatement
 
-_NAME = r"[A-Za-z][A-Za-z0-9_\-]*"
+_NAME = r"[A-Za-z][A-Za-z0-9_\-#@$]*"
 _NAME_RE = re.compile(_NAME)
 _REFMOD_RE = re.compile(rf"({_NAME})\s*\((?P<args>[^()]*:[^()]*)\)")
 _SUBSCRIPT_RE = re.compile(rf"({_NAME})\s*\(([^():]*)\)")
 
-_PROGRAM_ID_RE = re.compile(r"PROGRAM-ID\s*\.?\s*([A-Za-z0-9][A-Za-z0-9_\-]*)", re.I)
-_EXEC_SQL_START_RE = re.compile(r"(?<![A-Za-z0-9_-])EXEC\s+SQL(?![A-Za-z0-9_-])", re.I)
-_EXEC_SQL_END_RE = re.compile(r"(?<![A-Za-z0-9_-])END-EXEC(?![A-Za-z0-9_-])", re.I)
+_PROGRAM_ID_RE = re.compile(r"PROGRAM-ID\s*\.?\s*([A-Za-z0-9][A-Za-z0-9_\-#@$]*)", re.I)
+_EXEC_SQL_START_RE = re.compile(r"(?<![A-Za-z0-9_\-#@$])EXEC\s+SQL(?![A-Za-z0-9_\-#@$])", re.I)
+_EXEC_SQL_END_RE = re.compile(r"(?<![A-Za-z0-9_\-#@$])END-EXEC(?![A-Za-z0-9_\-#@$])", re.I)
 # Paragraph and section names routinely start with a digit ("1000-READ-CUST").
-_PARAGRAPH_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9_\-]*)\s*\.?\s*$")
+_PARAGRAPH_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9_\-#@$]*)\s*\.?\s*$")
 
 # Statement verbs used to chop a sentence into individual statements.
 _VERBS = [
@@ -49,7 +49,7 @@ _VERBS = [
     "END-MULTIPLY", "END-DIVIDE", "END-SEARCH", "END-WRITE",
 ]
 _VERB_RE = re.compile(
-    r"(?<![A-Za-z0-9_-])(" + "|".join(sorted(_VERBS, key=len, reverse=True)) + r")(?![A-Za-z0-9_-])",
+    r"(?<![A-Za-z0-9_\-#@$])(" + "|".join(sorted(_VERBS, key=len, reverse=True)) + r")(?![A-Za-z0-9_\-#@$])",
     re.I,
 )
 
@@ -387,7 +387,7 @@ def known_identifiers(program: Program, text: str) -> list[str]:
 
 
 def _split_on_keyword(text: str, keyword: str) -> tuple[str, str]:
-    pattern = re.compile(rf"(?<![A-Za-z0-9_-]){keyword}(?![A-Za-z0-9_-])", re.I)
+    pattern = re.compile(rf"(?<![A-Za-z0-9_\-#@$]){keyword}(?![A-Za-z0-9_\-#@$])", re.I)
     match = pattern.search(text)
     if not match:
         return text, ""
@@ -474,7 +474,7 @@ def _handle_string(program: Program, chunk: str, ref: SourceRef) -> None:
         return
     # DELIMITED BY clauses name delimiters, not data being concatenated.
     concatenated = re.sub(
-        r"(?<![A-Za-z0-9_-])DELIMITED\s+BY\s+(SIZE|[^\s]+)", " ", source_text, flags=re.I
+        r"(?<![A-Za-z0-9_\-#@$])DELIMITED\s+BY\s+(SIZE|[^\s]+)", " ", source_text, flags=re.I
     )
     sources = known_identifiers(program, concatenated)
     target_text, _ = _split_on_keyword(target_text, "WITH")
@@ -498,7 +498,7 @@ def _handle_unstring(program: Program, chunk: str, ref: SourceRef) -> None:
     if not target_text:
         return
     source_text = re.sub(
-        r"(?<![A-Za-z0-9_-])DELIMITED\s+BY\s+(ALL\s+)?(SIZE|[^\s]+)", " ", source_text, flags=re.I
+        r"(?<![A-Za-z0-9_\-#@$])DELIMITED\s+BY\s+(ALL\s+)?(SIZE|[^\s]+)", " ", source_text, flags=re.I
     )
     sources = known_identifiers(program, source_text)
     target_text, _ = _split_on_keyword(target_text, "WITH")
@@ -560,7 +560,7 @@ def _arithmetic(program: Program, chunk: str, ref: SourceRef, verb: str, joiner:
     body = re.sub(rf"^\s*{verb}\s+", "", chunk, flags=re.I)
     main, giving_text = _split_on_keyword(body, "GIVING")
     giving_text, _ = _split_on_keyword(giving_text, "REMAINDER")
-    joiner_re = re.compile(rf"(?<![A-Za-z0-9_-])(?:{joiner})(?![A-Za-z0-9_-])", re.I)
+    joiner_re = re.compile(rf"(?<![A-Za-z0-9_\-#@$])(?:{joiner})(?![A-Za-z0-9_\-#@$])", re.I)
     match = joiner_re.search(main)
     head = main[: match.start()] if match else main
     tail = main[match.end():] if match else ""
@@ -642,10 +642,10 @@ def _handle_initialize(program: Program, chunk: str, ref: SourceRef) -> None:
 
 
 _RELATION_RE = re.compile(
-    r"(?P<left>'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9_\-]*(?:\s*\([^)]*\))?)\s*"
+    r"(?P<left>'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9_\-#@$]*(?:\s*\([^)]*\))?)\s*"
     r"(?P<op>=|<>|>=|<=|>|<|(?:IS\s+)?(?:NOT\s+)?(?:GREATER|LESS|EQUAL)(?:\s+THAN)?"
     r"(?:\s+OR\s+EQUAL(?:\s+TO)?)?)\s*"
-    r"(?P<right>'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9_\-]*(?:\s*\([^)]*\))?)",
+    r"(?P<right>'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9_\-#@$]*(?:\s*\([^)]*\))?)",
     re.I,
 )
 

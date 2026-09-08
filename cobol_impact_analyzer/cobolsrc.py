@@ -15,6 +15,15 @@ from typing import Iterable, Iterator, Sequence
 FIXED = "fixed"
 FREE = "free"
 
+# IBM COBOL allows "#", "@" and "$" inside user-defined words, and mainframe
+# shops use them freely in copybook and field names. Because a plain "\b" would
+# then match a keyword sitting inside a name, every keyword pattern in this
+# package brackets itself with these two guards instead.
+NAME_CHARS = r"A-Za-z0-9_\-#@$"
+COBOL_NAME = r"[A-Za-z0-9][A-Za-z0-9_\-#@$]*"
+BOUNDARY_L = r"(?<![A-Za-z0-9_\-#@$])"
+BOUNDARY_R = r"(?![A-Za-z0-9_\-#@$])"
+
 _SEQ_AREA = slice(0, 6)
 _INDICATOR = 6
 _CODE_AREA = slice(7, 72)
@@ -148,10 +157,10 @@ def code_lines(lines: Iterable[LogicalLine]) -> list[LogicalLine]:
 
 _TOKEN_RE = re.compile(
     r"""
-    '(?:[^']|'')*'          |   # single quoted literal
-    "(?:[^"]|"")*"          |   # double quoted literal
-    [A-Za-z0-9][A-Za-z0-9_\-]*  |
-    ::                      |
+    '(?:[^']|'')*'              |   # single quoted literal
+    "(?:[^"]|"")*"              |   # double quoted literal
+    [A-Za-z0-9][A-Za-z0-9_\-#@$]*  |
+    ::                          |
     [(),.:;=<>+*/&-]
     """,
     re.VERBOSE,

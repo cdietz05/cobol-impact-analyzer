@@ -1,4 +1,4 @@
-"""Embedded SQL parsing for Pro*COBOL ``EXEC SQL`` blocks.
+﻿"""Embedded SQL parsing for Pro*COBOL ``EXEC SQL`` blocks.
 
 The goal is not a complete SQL grammar; it is to answer one question reliably:
 *which column is bound to which host variable, and in which direction*.  That is
@@ -78,7 +78,7 @@ class SqlStatement:
         }
 
 
-_HOST_VAR_RE = re.compile(r":\s*([A-Za-z][A-Za-z0-9_\-]*(?:\s*\.\s*[A-Za-z][A-Za-z0-9_\-]*)*)")
+_HOST_VAR_RE = re.compile(r":\s*([A-Za-z][A-Za-z0-9_\-#@$]*(?:\s*\.\s*[A-Za-z][A-Za-z0-9_\-#@$]*)*)")
 _LINE_COMMENT_RE = re.compile(r"--[^\n]*")
 _BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 _IDENT = r"[A-Za-z][A-Za-z0-9_$#]*"
@@ -453,7 +453,7 @@ class SqlAnalyzer:
                     direction=Direction.IN,
                     indicator=names[1] if len(names) > 1 else "",
                 )
-                if not re.fullmatch(r"\s*:\s*[A-Za-z][A-Za-z0-9_\-]*\s*", rhs):
+                if not re.fullmatch(r"\s*:\s*[A-Za-z][A-Za-z0-9_\-#@$]*\s*", rhs):
                     binding.expression = rhs.strip()
                     binding.note = "assigned through an expression"
                 statement.bindings.append(binding)
@@ -567,11 +567,11 @@ def _matching_paren(text: str, open_index: int) -> int:
 
 
 _PREDICATE_RE = re.compile(
-    rf"({_QUALIFIED})\s*(=|<>|!=|>=|<=|>|<|(?:NOT\s+)?LIKE)\s*:\s*([A-Za-z][A-Za-z0-9_\-]*)",
+    rf"({_QUALIFIED})\s*(=|<>|!=|>=|<=|>|<|(?:NOT\s+)?LIKE)\s*:\s*([A-Za-z][A-Za-z0-9_\-#@$]*)",
     re.I,
 )
 _PREDICATE_REVERSED_RE = re.compile(
-    rf":\s*([A-Za-z][A-Za-z0-9_\-]*)\s*(=|<>|!=|>=|<=|>|<)\s*({_QUALIFIED})",
+    rf":\s*([A-Za-z][A-Za-z0-9_\-#@$]*)\s*(=|<>|!=|>=|<=|>|<)\s*({_QUALIFIED})",
     re.I,
 )
 

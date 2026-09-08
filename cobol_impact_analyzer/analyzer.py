@@ -22,7 +22,7 @@ from typing import Iterable, Optional
 
 from . import picture
 from . import progress as progress_mod
-from .copybook import CopybookResolver
+from .copybook import DEFAULT_COPYBOOK_SUFFIXES, CopybookResolver
 from .progress import Progress
 from .models import (
     Capacity,
@@ -131,6 +131,9 @@ class ImpactAnalyzer:
         self.warnings: list[str] = []
         # (program name, field name) -> node id, for resolving usages later.
         self._field_nodes: dict[tuple[str, str], str] = {}
+        # Same index keyed by a dash/underscore-insensitive name, consulted only
+        # after an exact lookup fails.
+        self._field_nodes_loose: dict[tuple[str, str], str] = {}
         self._node_fields: dict[str, list[tuple[Program, Field]]] = {}
         self._seed_changes: dict[str, ColumnChange] = {}
         self._depth: dict[str, int] = {}
@@ -167,9 +170,17 @@ class ImpactAnalyzer:
     # -- stage 1: parse ---------------------------------------------------
 
     def _parse_sources(self) -> None:
+        # --copybook-ext adds to the defaults rather than replacing them; a shop
+        # with one unusual extension still has extensionless members elsewhere,
+        # and silently dropping those would cost real coverage.
+        suffixes = None
+        if self.spec.copybook_suffixes:
+            suffixes = sorted(
+                set(DEFAULT_COPYBOOK_SUFFIXES) | set(self.spec.copybook_suffixes)
+            )
         resolver = CopybookResolver(
             self.spec.copybook_paths,
-            suffixes=self.spec.copybook_suffixes or None,
+            suffixes=suffixes,
             progress=self.progress,
         )
         parser = ProgramParser(resolver)
@@ -237,6 +248,7 @@ class ImpactAnalyzer:
             )
             self.graph.add_node(node)
             self._field_nodes[(program.name, item.name)] = node_id
+            self._field_nodes_loose.setdefault((program.name, _loose(item.name)), node_id)
             self._node_fields.setdefault(node_id, []).append((program, item))
 
     def _add_sql_edges(self, program: Program) -> None:
@@ -251,9 +263,25 @@ class ImpactAnalyzer:
                     continue
                 variable_id = self._field_nodes.get((program.name, binding.host_var))
                 if variable_id is None:
+                    # SQL columns are spelled with underscores and COBOL fields
+                    # with hyphens, and the two do get mixed up. Only fall back
+                    # once the exact name has already missed, so this can soften
+                    # a spelling slip without inventing a match.
+                    variable_id = self._field_nodes_loose.get(
+                        (program.name, _loose(binding.host_var))
+                    )
+                    if variable_id is not None:
+                        self.warnings.append(
+                            f"{statement.ref.location()}: host variable "
+                            f":{binding.host_var} matched a declared field only after "
+                            "normalising hyphens and underscores; confirm it is the "
+                            "field you meant"
+                        )
+                if variable_id is None:
                     self.warnings.append(
                         f"{statement.ref.location()}: host variable :{binding.host_var} "
-                        f"is not declared in {program.name}"
+                        f"is not declared in {program.name} — its column binding is "
+                        "not traced"
                     )
                     continue
                 column_id = _column_id(table, binding.column)
@@ -722,6 +750,11 @@ class ImpactAnalyzer:
 
 def _column_id(table: str, column: str) -> str:
     return f"col:{table.upper()}.{column.upper()}"
+
+
+def _loose(name: str) -> str:
+    """Fold the hyphen/underscore distinction, which the two languages disagree on."""
+    return name.upper().replace("_", "-")
 
 
 def _effective_capacity(item: Field) -> Capacity:

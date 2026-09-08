@@ -20,18 +20,19 @@ from .models import Capacity, Field, Kind, SourceRef
 from .picture import normalize_usage, parse_picture
 from .progress import Progress
 
-# COBOL names may contain hyphens, so "\b" is not enough to isolate a keyword:
-# it happily matches COMP inside WS-COMP-CODE. These guards demand that no name
-# character sits on either side of the keyword.
-_L = r"(?<![A-Za-z0-9_-])"
-_R = r"(?![A-Za-z0-9_-])"
+# COBOL names may contain hyphens (and #, @, $ on IBM systems), so "\b" is not
+# enough to isolate a keyword: it happily matches COMP inside WS-COMP-CODE.
+# These guards demand that no name character sits on either side of the keyword.
+_L = cobolsrc.BOUNDARY_L
+_R = cobolsrc.BOUNDARY_R
+_NAME = cobolsrc.COBOL_NAME
 
-_LEVEL_RE = re.compile(r"^(\d{1,2})\s+([A-Za-z0-9][A-Za-z0-9_\-]*)(.*)$", re.DOTALL)
+_LEVEL_RE = re.compile(rf"^(\d{{1,2}})\s+({_NAME})(.*)$", re.DOTALL)
 _PIC_RE = re.compile(
     rf"{_L}(?:PIC|PICTURE){_R}\s+(?:IS\s+)?(?P<pic>[^\s]+(?:\s*\(\s*\d+\s*\))?)", re.I
 )
 _OCCURS_RE = re.compile(rf"{_L}OCCURS{_R}\s+(?:(\d+)\s+TO\s+)?(\d+)", re.I)
-_REDEFINES_RE = re.compile(rf"{_L}REDEFINES{_R}\s+([A-Za-z0-9][A-Za-z0-9_\-]*)", re.I)
+_REDEFINES_RE = re.compile(rf"{_L}REDEFINES{_R}\s+({_NAME})", re.I)
 _VALUE_RE = re.compile(
     rf"{_L}VALUES?{_R}\s+(?:IS\s+|ARE\s+)?"
     r"(?P<val>'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|[^\s.]+)",
@@ -45,12 +46,12 @@ _USAGE_RE = re.compile(
 )
 _SIGN_SEPARATE_RE = re.compile(rf"{_L}SIGN{_R}.*?{_L}SEPARATE{_R}", re.I)
 _VARYING_RE = re.compile(rf"{_L}VARYING{_R}", re.I)
-_DEPENDING_RE = re.compile(rf"{_L}DEPENDING{_R}\s+(?:ON\s+)?([A-Za-z0-9][A-Za-z0-9_\-]*)", re.I)
+_DEPENDING_RE = re.compile(rf"{_L}DEPENDING{_R}\s+(?:ON\s+)?({_NAME})", re.I)
 
 _COPY_RE = re.compile(
-    r"(?<![A-Za-z0-9_-])COPY(?![A-Za-z0-9_-])\s+"
-    r"(?P<name>[A-Za-z0-9][A-Za-z0-9_\-]*|'[^']+'|\"[^\"]+\")"
-    r"(?:\s+(?:OF|IN)\s+[A-Za-z0-9][A-Za-z0-9_\-]*)?"
+    rf"{_L}COPY{_R}\s+"
+    rf"(?P<name>{_NAME}|'[^']+'|\"[^\"]+\")"
+    rf"(?:\s+(?:OF|IN)\s+{_NAME})?"
     r"(?P<rest>.*)$",
     re.I | re.DOTALL,
 )
@@ -60,8 +61,14 @@ _REPLACING_PAIR_RE = re.compile(
 )
 
 # Extensions that plausibly hold a copybook. The empty string keeps
-# extensionless members, which mainframe-derived trees are full of.
-_COPYBOOK_SUFFIXES = (".cpy", ".cbl", ".cob", ".inc", ".copy", ".cpb", ".cbk", ".src", "")
+# extensionless members, which mainframe-derived trees are full of — a shop that
+# ships its copylib straight off the mainframe has no extensions at all.
+DEFAULT_COPYBOOK_SUFFIXES = (
+    ".cpy", ".cbl", ".cob", ".inc", ".copy", ".cpb", ".cbk", ".src", "",
+)
+
+# Retained under the old private name for anything importing it already.
+_COPYBOOK_SUFFIXES = DEFAULT_COPYBOOK_SUFFIXES
 
 # Directories never worth walking when looking for a copybook.
 _PRUNED_DIRS = frozenset(
@@ -85,14 +92,16 @@ class DataMap:
 
     def add(self, item: Field) -> None:
         key = normalize_name(item.name)
+        # "!" is not legal in a COBOL word, so a synthetic key can never collide
+        # with a real field name. "#" would: it is legal on IBM systems.
         if key == "FILLER":
             # FILLER is unaddressable; keep it for sizing under a unique key.
-            key = f"FILLER#{len(self.order)}"
+            key = f"FILLER!{len(self.order)}"
             item.name = key
         if key in self.fields:
             # Duplicate names across copybooks are common; keep the first and
             # record the second only for size purposes under a suffixed key.
-            key = f"{key}#{len(self.order)}"
+            key = f"{key}!{len(self.order)}"
         self.fields[key] = item
         self.order.append(key)
 

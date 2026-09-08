@@ -5,6 +5,7 @@ from pathlib import Path
 from cobol_impact_analyzer import report
 from cobol_impact_analyzer.analyzer import analyze
 from cobol_impact_analyzer.cli import main
+from cobol_impact_analyzer.copybook import DEFAULT_COPYBOOK_SUFFIXES, CopybookResolver
 from cobol_impact_analyzer.models import Severity
 from cobol_impact_analyzer.spec import ChangeSpec, build_change, load_spec
 
@@ -128,6 +129,78 @@ class CoverageTests(unittest.TestCase):
         spec.max_depth = 1
         result = analyze(spec)
         self.assertFalse(_find(result, "var:FMTNAME::WS-WORK-NAME"))
+
+
+class NameSpellingTests(unittest.TestCase):
+    """SQL columns use underscores; COBOL fields use hyphens."""
+
+    def test_underscore_column_binds_to_a_hyphen_field(self):
+        result = _run_name_widening()
+        # CUSTOMER.CUST_NAME (underscore) reaches CUST-NAME (hyphen) because the
+        # binding comes from the SELECT INTO, never from matching the spellings.
+        findings = _find(result, "var:CUST-NAME")
+        self.assertTrue(findings)
+        self.assertEqual(findings[0].path[0], "col:CUSTOMER.CUST_NAME")
+
+    def test_a_mismatched_host_variable_still_resolves_and_warns(self):
+        import tempfile
+
+        program = (
+            "       IDENTIFICATION DIVISION.\n"
+            "       PROGRAM-ID. LOOSE.\n"
+            "       DATA DIVISION.\n"
+            "       WORKING-STORAGE SECTION.\n"
+            "       01  CUST-NAME  PIC X(30).\n"
+            "       PROCEDURE DIVISION.\n"
+            "       0000-MAIN.\n"
+            "           EXEC SQL\n"
+            "               SELECT CUST_NAME INTO :CUST_NAME FROM CUSTOMER\n"
+            "           END-EXEC\n"
+            "           STOP RUN.\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "loose.pco").write_text(program, encoding="utf-8")
+            spec = ChangeSpec(
+                changes=[build_change("CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)")],
+                source_paths=[root],
+                copybook_paths=[root],
+            )
+            result = analyze(spec)
+            self.assertTrue(_find(result, "var:LOOSE::CUST-NAME"))
+            self.assertTrue(
+                any("normalising hyphens and underscores" in w for w in result.warnings),
+                result.warnings,
+            )
+
+
+class CopybookExtensionTests(unittest.TestCase):
+    def test_a_custom_extension_adds_to_the_defaults_rather_than_replacing(self):
+        import tempfile
+
+        from cobol_impact_analyzer.analyzer import ImpactAnalyzer
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "ODDBOOK.cpylib").write_text("       01  A PIC X(4).\n", encoding="utf-8")
+            (root / "PLAINBOOK").write_text("       01  B PIC X(4).\n", encoding="utf-8")
+
+            spec = ChangeSpec(
+                changes=[build_change("T", "C", "CHAR(1)", "CHAR(2)")],
+                source_paths=[root],
+                copybook_paths=[root],
+                copybook_suffixes=[".cpylib"],
+            )
+            analyzer = ImpactAnalyzer(spec)
+            analyzer._parse_sources()
+            resolver = CopybookResolver(
+                spec.copybook_paths,
+                suffixes=sorted(set(DEFAULT_COPYBOOK_SUFFIXES) | {".cpylib"}),
+            )
+            self.assertIsNotNone(resolver.resolve("ODDBOOK"))
+            # The extensionless member must survive the custom extension.
+            self.assertIsNotNone(resolver.resolve("PLAINBOOK"))
+            self.assertIsNone(resolver._fallback_index)
 
 
 class SpecTests(unittest.TestCase):

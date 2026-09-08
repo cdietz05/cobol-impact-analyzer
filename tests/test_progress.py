@@ -111,6 +111,25 @@ class ResolverLazinessTests(unittest.TestCase):
             resolver = CopybookResolver([root], suffixes=[".cpb"])
             self.assertIsNotNone(resolver.resolve("BOOK"))
 
+    def test_extensionless_copybooks_resolve_from_nested_directories(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            deep = root / "copylib" / "prod" / "common"
+            deep.mkdir(parents=True)
+            # Mainframe copylibs ship members with no extension at all.
+            (deep / "CU01TB01").write_text(
+                "       01  CUST-REC.\n           05  CUST-NAME PIC X(30).\n",
+                encoding="utf-8",
+            )
+            resolver = CopybookResolver([root / "copylib"])
+            found = resolver.resolve("CU01TB01")
+            self.assertIsNotNone(found)
+            self.assertEqual(found.name, "CU01TB01")
+            # The default suffix set already covers them, so no full scan is needed.
+            self.assertIsNone(resolver._fallback_index)
+
 
 class DiscoveryTests(unittest.TestCase):
     def test_version_control_directories_are_not_scanned(self):

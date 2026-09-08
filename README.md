@@ -131,6 +131,54 @@ Relative paths resolve against the spec file's own directory.
 
 ---
 
+## What it reads out of a copybook — and how it links to a column
+
+The copybook supplies **declarations only**. For each entry it records the level
+number, name, `PIC`, `USAGE`, `OCCURS`, `REDEFINES`, `VALUE` and any `88`
+condition names, then derives two things: the **capacity** (character positions,
+or integer and decimal digits) and the **byte size**, which depends on usage —
+`PIC S9(9) COMP-3` is 11 digits in 6 bytes, not 11. Group items get the sum of
+their children, which is the record length that matters when the layout moves.
+
+Nothing in the copybook is matched against a column name. **The link is made
+entirely by the embedded SQL.** When a program says:
+
+```cobol
+EXEC SQL
+    SELECT CUST_NAME INTO :CUST-NAME FROM CUSTOMER
+END-EXEC
+```
+
+the tool binds `CUSTOMER.CUST_NAME` to whichever field is declared as
+`CUST-NAME`. That is why the SQL underscore / COBOL hyphen convention causes no
+trouble: the two spellings never have to agree, because the statement already
+says which is which. (If a host variable name misses entirely, one
+hyphen/underscore-insensitive retry runs and warns loudly rather than silently
+binding the wrong field.)
+
+The consequence is worth stating plainly: **a copybook on its own tells the tool
+nothing.** A field only enters the graph when some `.pco` names it as a host
+variable, or moves data into it from one that is. A table copybook whose fields
+are never referenced individually in SQL produces no findings — which is exactly
+the case in the next paragraph.
+
+### The group-host-variable blind spot
+
+Some shops bind a whole record at once:
+
+```cobol
+EXEC SQL SELECT * INTO :CU01TB01-REC FROM CUSTOMER END-EXEC
+```
+
+There is no column-to-field mapping here to recover — it needs the table DDL,
+which this tool does not read. You get a `SELECT * cannot be mapped to columns`
+warning and the columns are not traced. If your programs are written this way,
+the impact trace starts at the group rather than the individual column, and you
+should widen the scan manually. Statements that name columns explicitly are the
+ones that trace cleanly.
+
+---
+
 ## What it understands
 
 **Declarations.** Fixed-format card image and free format, `COPY` with
