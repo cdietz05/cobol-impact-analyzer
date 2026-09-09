@@ -40,6 +40,71 @@ _SEVERITY_COLOR = {
 # Findings that describe a database change, not a source edit in a file.
 _NON_FILE_CATEGORIES = {"requested-change", "coverage-gap", "database-column"}
 
+# One line per severity for the section headers, and the full account for the
+# key. These mirror how the analyzer actually assigns severity: a truncating
+# edge (SQL fetch, MOVE, STRING/UNSTRING, COMPUTE, arithmetic, WRITE FROM,
+# READ INTO, reference modification) into an undersized field is CRITICAL;
+# the same shortfall reached by a non-truncating path, or another column that
+# needs its own ALTER, is HIGH; a grown record length or a width-sensitive
+# comparison is MEDIUM; and so on. A field that trips several of these keeps
+# one finding and takes the worst.
+_SEVERITY_BLURB = {
+    Severity.CRITICAL: (
+        "Silent data loss. A wider value lands in a field too small to hold it "
+        "through an edge that truncates without complaint."
+    ),
+    Severity.HIGH: (
+        "Wrong, but it shows. Another database column now needs its own ALTER, "
+        "or a field is undersized on a non-truncating path, or a hard-coded "
+        "reference modification no longer spans the field."
+    ),
+    Severity.MEDIUM: (
+        "Needs a human. A record length grew, a padded comparison or INSPECT "
+        "shifts, a VALUE clause may be stale, or a column could not be traced "
+        "at all."
+    ),
+    Severity.LOW: (
+        "Cosmetic or informational. DISPLAY alignment, INITIALIZE, SET — "
+        "check it, nothing breaks on its own."
+    ),
+    Severity.INFO: "The change you asked for, echoed back with its DDL. The root of every trace.",
+}
+
+_SEVERITY_DETAIL = {
+    Severity.CRITICAL: [
+        "The value reaches the field through a SELECT/FETCH INTO, MOVE, "
+        "STRING/UNSTRING, COMPUTE, ADD/SUBTRACT/MULTIPLY/DIVIDE, WRITE FROM, "
+        "READ INTO or reference modification.",
+        "COBOL drops the overflow with no error at compile time or run time — "
+        "trailing characters for text, high-order digits for numbers.",
+    ],
+    Severity.HIGH: [
+        "Another table's column receives the widened value and must be ALTERed "
+        "too; writing the wider value first raises ORA-01401 / ORA-12899.",
+        "A field is too small but is reached by a CALL argument, a host variable "
+        "in a WHERE predicate, or a REDEFINES over shared storage — it fails "
+        "as a bind error or a mismatch rather than losing data quietly.",
+        "A reference modification with a hard-coded offset or length that no "
+        "longer covers the field.",
+    ],
+    Severity.MEDIUM: [
+        "A group or record length grew, so every file, queue, CALL interface or "
+        "REDEFINES built on the old length must be reviewed and rebuilt.",
+        "A literal comparison or INSPECT whose result changes because the field "
+        "is now padded wider.",
+        "A VALUE clause that may no longer be right.",
+        "A column that could not be traced (dynamic SQL, SELECT *, a cursor in "
+        "an unscanned copybook) — reported so “no impact” is not read as “safe”.",
+    ],
+    Severity.LOW: [
+        "DISPLAY output or log alignment shifts.",
+        "INITIALIZE or SET on the field — confirm the value still fits.",
+    ],
+    Severity.INFO: [
+        "The requested column change and its ALTER statement.",
+    ],
+}
+
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
@@ -329,6 +394,11 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
     lines.append(f"{len(result.programs)} program(s) scanned  |  findings: {tally}")
     lines.append("")
 
+    lines.append("SEVERITY  (worst wins when a field trips several)")
+    for level in _SEVERITY_ORDER:
+        lines.append(f"  {level.value:<9} {_SEVERITY_BLURB[level]}")
+    lines.append("")
+
     lines.append("REQUESTED CHANGES")
     for change in result.spec.changes:
         lines.append(f"  {change.key:<40} {change.old_type} -> {change.new_type}")
@@ -602,6 +672,18 @@ details.warn { background: var(--panel); border: 1px solid var(--line);
                border-left: 3px solid #b8531b; border-radius: 8px; padding: 10px 14px; }
 details.warn summary { cursor: pointer; font-weight: 600; }
 details.warn ul { margin: 10px 0 0; }
+
+details.sevkey { background: var(--panel); border: 1px solid var(--line);
+                 border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+details.sevkey summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+details.sevkey dl { margin: 12px 0 0; display: grid;
+                    grid-template-columns: max-content 1fr; gap: 6px 14px; }
+details.sevkey dt { font-weight: 700; font-size: 11px; letter-spacing: 0.04em; }
+details.sevkey dd { margin: 0; }
+details.sevkey dd ul { margin: 4px 0 0; padding-left: 16px; color: var(--muted);
+                       font-size: 12.5px; }
+h3 .blurb { display: block; font-size: 12px; font-weight: 400; color: var(--muted);
+            margin-top: 2px; }
 """
 
 
@@ -725,6 +807,23 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
         )
     parts.append("</div>")
 
+    parts.append(
+        "<details class='sevkey'><summary>What the severities mean</summary><dl>"
+    )
+    for level in _SEVERITY_ORDER:
+        bullets = "".join(
+            f"<li>{html.escape(item)}</li>" for item in _SEVERITY_DETAIL[level]
+        )
+        parts.append(
+            f"<dt style='color:{_SEVERITY_COLOR[level]}'>{level.value}</dt>"
+            f"<dd>{html.escape(_SEVERITY_BLURB[level])}<ul>{bullets}</ul></dd>"
+        )
+    parts.append(
+        "</dl><p class='legend' style='margin:10px 0 0'>A field that trips "
+        "several of these stays one finding and takes the worst severity.</p>"
+        "</details>"
+    )
+
     # 1. the base value
     parts.append("<h2>Requested change</h2><div class='scroll'><table>")
     parts.append("<tr><th>Column</th><th>From</th><th>To</th><th>DDL</th></tr>")
@@ -764,7 +863,8 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
         bucket = [f for f in result.findings if f.severity is level]
         parts.append(f"<section id='sev-{level.value.lower()}'>")
         parts.append(
-            f"<h3>{level.value} <span class='muted'>({len(bucket)})</span></h3>"
+            f"<h3>{level.value} <span class='muted'>({len(bucket)})</span>"
+            f"<span class='blurb'>{html.escape(_SEVERITY_BLURB[level])}</span></h3>"
         )
         if not bucket:
             parts.append("<p class='muted'>none</p></section>")

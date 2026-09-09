@@ -268,11 +268,15 @@ a `COMP-3` field widening by two digits grows its record by one byte, not two.
 
 | Severity | Meaning |
 | --- | --- |
-| `CRITICAL` | Silent data loss. A truncating edge (SQL fetch, `MOVE`, `STRING`, arithmetic) lands a wider value in a field that cannot hold it. |
-| `HIGH` | Will not work. Another database column needs an `ALTER`, or a hard-coded reference modification no longer covers the field. |
-| `MEDIUM` | Needs a human. Record length changed, a `VALUE` clause or literal comparison assumes the old width, or a column could not be traced at all. |
-| `LOW` | Cosmetic or informational. Report alignment, `DISPLAY`, `INITIALIZE`. |
-| `INFO` | The change you asked for, echoed back with its DDL. |
+| `CRITICAL` | Silent data loss. A wider value lands in a field too small for it through a **truncating** edge — `SELECT`/`FETCH INTO`, `MOVE`, `STRING`/`UNSTRING`, `COMPUTE`, arithmetic, `WRITE FROM`, `READ INTO`, reference modification. COBOL drops the overflow with no error: trailing characters for text, high-order digits for numbers. |
+| `HIGH` | Wrong, but it surfaces. Another database column receives the value and needs its own `ALTER` (`ORA-01401`/`ORA-12899`); or a field is undersized on a **non-truncating** path (`CALL` argument, host variable in a `WHERE`, `REDEFINES` over shared storage); or a hard-coded reference modification no longer spans the field. |
+| `MEDIUM` | Needs a human decision. A group/record length grew (every file, queue, `CALL` interface or `REDEFINES` on the old length must be rebuilt); a padded literal comparison or `INSPECT` shifts; a `VALUE` clause may be stale; or a column could not be traced at all (dynamic SQL, `SELECT *`, cursor in an unscanned copybook). |
+| `LOW` | Cosmetic or informational. `DISPLAY` alignment, `INITIALIZE`, `SET`. |
+| `INFO` | The change you asked for, echoed back with its DDL. The root of every trace. |
+
+A field that trips several of these keeps one finding and takes the worst
+severity. The same table, one line per severity, is in the text report and
+behind the **What the severities mean** disclosure in the HTML page.
 
 Use `--fail-on HIGH` in a pipeline to exit non-zero when anything at HIGH or
 worse is found.

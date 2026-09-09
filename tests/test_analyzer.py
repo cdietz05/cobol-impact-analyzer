@@ -264,6 +264,19 @@ class ReportTests(unittest.TestCase):
         self.assertIn("<h2>Flow</h2>", html)
         self.assertIn("<h2>Changes by module</h2>", html)
 
+    def test_html_explains_every_severity(self):
+        html = report.to_html(self.result)
+        self.assertIn("What the severities mean", html)
+        for level in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"):
+            self.assertIn(f"<dt style='color:", html)
+            self.assertIn(report._SEVERITY_BLURB[Severity(level)][:24], html)
+
+    def test_text_report_explains_every_severity(self):
+        text = report.to_text(self.result)
+        self.assertIn("SEVERITY", text)
+        for level in Severity:
+            self.assertIn(report._SEVERITY_BLURB[level][:24], text)
+
     def test_text_report_has_flow_and_per_module_sections(self):
         text = report.to_text(self.result)
         self.assertIn("FLOW", text)
