@@ -53,26 +53,36 @@ pip install -e .
 Run it against the bundled example:
 
 ```bash
-python -m cobol_impact_analyzer --spec examples/change_spec.json --out out
+python -m cobol_impact_analyzer --spec examples/change_spec.json --out examples/output
 ```
 
-You get `out/impact.json`, `out/impact.csv` and `out/impact.html`, plus a report
-on stdout that starts like this:
+You get `CUSTOMER.json`, `CUSTOMER.csv`, `CUSTOMER.html` and `CUSTOMER.md`
+(a per-file change list) in that directory. The generated set for the bundled
+example is committed under [`examples/output/`](examples/output/) so you can read
+it without running anything.
+
+The stdout report has three sections — the base value, the trace, and the edits
+per file:
 
 ```
 REQUESTED CHANGES
   CUSTOMER.CUST_NAME                       VARCHAR2(30) -> VARCHAR2(60)
   CUSTOMER.CUST_BALANCE                    NUMBER(11,2) -> NUMBER(13,2)
 
-CRITICAL (4)
-------------------------------------------------------------------------------
-  [host-variable] CUST-NAME is too small for the widened value
-      now      : 05 CUST-NAME PIC X(30) DISPLAY
-      needs    : alphanumeric(60)
-      action   : Change to: 05 CUST-NAME PIC X(60).
-      at       : examples/src/cust_update.pco:25  (CUSTUPD)
-      path     : CUSTOMER.CUST_NAME -> CUST-NAME
+FLOW  (where the value moves; [SEVERITY] marks a field that will not hold it)
+  CUSTOMER.CUST_NAME   VARCHAR2(30) -> VARCHAR2(60)
+    CUST-NAME  X(30) -> X(60)  [CRITICAL]  CUSTUPD  examples/src/cust_update.pco:26
+      WS-SNAPSHOT-NAME  X(30) -> X(60)  [CRITICAL]  CUSTUPD  examples/src/cust_update.pco:46
+        ORDER_AUDIT.AUDIT_CUST_NAME  X(30) -> X(60)  [HIGH]  CUSTUPD  .../cust_update.pco:54
+
+CHANGES BY MODULE  (9 file(s) to edit)
+  examples/copybooks/CUSTOMER.cpy
+      CUST-NAME                05 CUST-NAME PIC X(30) DISPLAY
+                                 -> 05 CUST-NAME PIC X(60).   (line 6)
 ```
+
+In the HTML the severity tiles at the top link straight to that severity's
+section.
 
 Or skip the spec file entirely:
 
@@ -302,14 +312,16 @@ resolves — you just pay for the walk once.
 
 ## Output
 
-- **stdout** — grouped by severity, with the propagation path and source
-  locations. `--verbose` adds the reasoning behind each finding.
+- **stdout** — the base value, the flow trace, then the edits grouped by file.
+  `--verbose` adds the reasoning behind each finding under its flow line.
 - **`--json FILE`** — machine readable; `--include-graph` embeds the full node
   and edge list for your own tooling.
 - **`--csv FILE`** — one row per finding, for a spreadsheet or a ticket import.
 - **`--html FILE`** — a single self-contained page, no network access, light and
-  dark aware.
-- **`--out DIR`** — all three at once.
+  dark aware. The severity tiles link to per-severity sections.
+- **`--summary FILE`** — a Markdown list of the exact edit each source file
+  needs, plus the recompile-only build list.
+- **`--out DIR`** — all of the above, named for the table.
 
 ---
 
@@ -333,7 +345,8 @@ resolves — you just pay for the walk once.
 --json FILE                write JSON findings
 --csv FILE                 write CSV findings
 --html FILE                write an HTML report
---out DIR                  write impact.json, impact.csv and impact.html
+--summary FILE             write a Markdown per-file change list
+--out DIR                  write <TABLE>.json, .csv, .html and .md
 --include-graph            embed the data-flow graph in the JSON
 --quiet                    suppress the terminal report
 --no-progress              suppress the stderr progress lines

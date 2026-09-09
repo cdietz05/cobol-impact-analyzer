@@ -15,6 +15,10 @@ out/
 impact.json
 impact.csv
 impact.html
+
+# the generated report for the bundled example is committed on purpose
+!examples/output/
+!examples/output/**
 .idea/
 .vscode/
 .DS_Store

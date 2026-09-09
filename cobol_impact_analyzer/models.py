@@ -179,7 +179,9 @@ class SourceRef:
                 display = relative
         except (ValueError, OSError):
             pass  # different drive on Windows, or a path that no longer resolves
-        return f"{display}:{self.line}"
+        # Forward slashes so a report generated on Windows and one generated on
+        # Linux read the same (and diff the same in a committed example).
+        return f"{display.replace(chr(92), '/')}:{self.line}"
 
     def to_dict(self) -> dict[str, object]:
         return {

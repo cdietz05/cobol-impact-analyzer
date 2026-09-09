@@ -253,6 +253,46 @@ class ReportTests(unittest.TestCase):
         self.assertNotIn("<script src=", html)
         self.assertIn("CUST_NAME", html)
 
+    def test_html_tiles_link_to_severity_sections(self):
+        html = report.to_html(self.result)
+        for level in ("critical", "high", "medium", "low", "info"):
+            self.assertIn(f"href='#sev-{level}'", html)
+            self.assertIn(f"id='sev-{level}'", html)
+
+    def test_html_has_the_three_reader_sections(self):
+        html = report.to_html(self.result)
+        self.assertIn("<h2>Flow</h2>", html)
+        self.assertIn("<h2>Changes by module</h2>", html)
+
+    def test_text_report_has_flow_and_per_module_sections(self):
+        text = report.to_text(self.result)
+        self.assertIn("FLOW", text)
+        self.assertIn("CHANGES BY MODULE", text)
+        self.assertIn("CUSTOMER.CUST_NAME", text)
+
+    def test_summary_lists_each_edited_file_once(self):
+        summary = report.to_summary(self.result)
+        self.assertIn("# CUSTOMER widening", summary)
+        self.assertIn("## Files to edit", summary)
+        self.assertIn("CUSTOMER.cpy", summary)
+        # A copybook field reached through several programs is one edit line.
+        self.assertEqual(summary.count("**CUST-NAME**"), 1)
+
+    def test_out_writes_the_markdown_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            main(
+                [
+                    "--spec",
+                    str(EXAMPLES / "change_spec.json"),
+                    "--out",
+                    str(out),
+                    "--quiet",
+                    "--no-progress",
+                ]
+            )
+            self.assertTrue((out / "CUSTOMER.md").exists())
+
 
 class CliTests(unittest.TestCase):
     def test_end_to_end_writes_all_three_formats(self):

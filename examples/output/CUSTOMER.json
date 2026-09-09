@@ -1,0 +1,1406 @@
+{
+  "generated_at": "2026-09-09 22:05:06Z",
+  "spec": {
+    "changes": [
+      {
+        "table": "CUSTOMER",
+        "column": "CUST_NAME",
+        "old_type": "VARCHAR2(30)",
+        "new_type": "VARCHAR2(60)",
+        "old_capacity": "alphanumeric(30)",
+        "new_capacity": "alphanumeric(60)",
+        "alter": "ALTER TABLE CUSTOMER MODIFY CUST_NAME VARCHAR2(60);"
+      },
+      {
+        "table": "CUSTOMER",
+        "column": "CUST_BALANCE",
+        "old_type": "NUMBER(11,2)",
+        "new_type": "NUMBER(13,2)",
+        "old_capacity": "signed numeric(9.2)",
+        "new_capacity": "signed numeric(11.2)",
+        "alter": "ALTER TABLE CUSTOMER MODIFY CUST_BALANCE NUMBER(13,2);"
+      }
+    ],
+    "source_paths": [
+      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src"
+    ],
+    "copybook_paths": [
+      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks"
+    ],
+    "source_patterns": [
+      "*.pco",
+      "*.PCO"
+    ],
+    "copybook_suffixes": [],
+    "max_depth": 0
+  },
+  "summary": {
+    "programs_scanned": 8,
+    "nodes": 134,
+    "edges": 133,
+    "findings": {
+      "CRITICAL": 16,
+      "HIGH": 10,
+      "MEDIUM": 8,
+      "LOW": 0,
+      "INFO": 2
+    },
+    "programs_affected": 8,
+    "programs_recompile_only": 2
+  },
+  "ddl_plan": [
+    "ALTER TABLE CUSTOMER MODIFY CUST_NAME VARCHAR2(60);",
+    "ALTER TABLE CUSTOMER MODIFY CUST_BALANCE NUMBER(13,2);",
+    "ALTER TABLE CUST_ARCHIVE MODIFY ARCH_NAME VARCHAR2(60);",
+    "ALTER TABLE ORDER_AUDIT MODIFY AUDIT_CUST_NAME VARCHAR2(60);",
+    "ALTER TABLE ORDER_HISTORY MODIFY CUST_NAME_SNAP VARCHAR2(60);",
+    "ALTER TABLE ORDER_SHIP MODIFY SHIP_NAME VARCHAR2(60);"
+  ],
+  "program_impacts": [
+    {
+      "program": "CUSTARCH",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_archive.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ],
+      "own_work": [
+        "WS-ARCH-NAME must widen (alphanumeric(30) -> alphanumeric(60))"
+      ]
+    },
+    {
+      "program": "CUSTTBL",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ],
+      "own_work": [
+        "WS-BAL-ENTRY must widen (signed numeric(9.2) -> signed numeric(11.2))",
+        "WS-BAL-TABLE must widen (group(600) -> group(602))"
+      ]
+    },
+    {
+      "program": "CUSTUPD",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy"
+      ],
+      "own_work": [
+        "CUST-NAME used via reference-modification",
+        "WS-REPORT-LINE used via display",
+        "WS-SNAPSHOT-NAME must widen (alphanumeric(30) -> alphanumeric(60))",
+        "WS-SNAPSHOT-NAME used via reference-modification"
+      ]
+    },
+    {
+      "program": "FMTNAME",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [],
+      "own_work": [
+        "LK-CUST-NAME must widen (alphanumeric(30) -> alphanumeric(60))",
+        "LK-FULL-ADDRESS must widen (alphanumeric(70) -> alphanumeric(100))",
+        "WS-WORK-NAME must widen (alphanumeric(30) -> alphanumeric(60))",
+        "WS-WORK-NAME used via inspect",
+        "WS-WORK-NAME used via literal-comparison"
+      ]
+    },
+    {
+      "program": "IOCUSTNM",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\io_custname.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [],
+      "own_work": [
+        "LK-IO-NAME must widen (alphanumeric(30) -> alphanumeric(60))"
+      ]
+    },
+    {
+      "program": "ORDENTRY",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\ORDERREC.cpy"
+      ],
+      "own_work": [
+        "WS-INVOICE-KEY must widen (alphanumeric(40) -> alphanumeric(60))",
+        "WS-SHIP-LABEL must widen (alphanumeric(30) -> alphanumeric(60))"
+      ]
+    },
+    {
+      "program": "CUSTLIST",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_list.pco",
+      "verdict": "recompile only",
+      "recompile_only": true,
+      "changed_copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ],
+      "own_work": []
+    },
+    {
+      "program": "CUSTPURG",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_purge.pco",
+      "verdict": "recompile only",
+      "recompile_only": true,
+      "changed_copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ],
+      "own_work": []
+    }
+  ],
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:CUSTARCH::CUST-NAME",
+      "title": "CUST-NAME is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/src/cust_archive.pco:17. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 05 CUST-NAME PIC X(60).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_archive.pco",
+          "line": 17,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "SELECT CUST_NAME INTO :CUST-NAME FROM CUSTOMER WHERE CUST_ID = :CUST-ID"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:CUSTLIST::CUST-NAME",
+      "title": "CUST-NAME is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/src/cust_list.pco:18. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 05 CUST-NAME PIC X(60).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTLIST::CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_list.pco",
+          "line": 18,
+          "program": "CUSTLIST",
+          "paragraph": "",
+          "text": "SELECT CUST_NAME, CUST_CITY INTO :CUST-NAME, :CUST-CITY FROM CUSTOMER WHERE CUST_ID = :CUST-ID"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTLIST",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:CUSTTBL::CUST-BALANCE",
+      "title": "CUST-BALANCE is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/src/cust_table.pco:22. Current PIC holds signed numeric(9.2), but signed numeric(11.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CUST-BALANCE PIC S9(9)V99 COMP-3",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 CUST-BALANCE PIC S9(11)V9(2) COMP-3.",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE",
+        "var:CUSTTBL::CUST-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+          "line": 22,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "SELECT CUST_BALANCE INTO :CUST-BALANCE FROM CUSTOMER WHERE CUST_ID = :CUST-ID"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 11,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "05  CUST-BALANCE         PIC S9(9)V99    COMP-3"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:CUSTUPD::CUST-BALANCE",
+      "title": "CUST-BALANCE is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/src/cust_update.pco:26. Current PIC holds signed numeric(9.2), but signed numeric(11.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CUST-BALANCE PIC S9(9)V99 COMP-3",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 CUST-BALANCE PIC S9(11)V9(2) COMP-3.",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE",
+        "var:CUSTUPD::CUST-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 26,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-N"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 11,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  CUST-BALANCE         PIC S9(9)V99    COMP-3"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:CUSTUPD::CUST-NAME",
+      "title": "CUST-NAME is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/src/cust_update.pco:26. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [
+        "reference-modification: the offset/length is hard-coded and will not follow the new width."
+      ],
+      "current": "05 CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 05 CUST-NAME PIC X(60).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 26,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-N"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 46,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "MOVE CUST-NAME (1:20) TO WS-SNAPSHOT-NAME"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:ORDENTRY::CUST-NAME",
+      "title": "CUST-NAME is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/src/order_entry.pco:34. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 05 CUST-NAME PIC X(60).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 34,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "FETCH CUST_CUR INTO :CUST-ID, :CUST-NAME, :ORD-NBR, :ORD-TOTAL"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CUSTARCH::WS-ARCH-NAME",
+      "title": "WS-ARCH-NAME is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/cust_archive.pco:23. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-ARCH-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-ARCH-NAME PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME",
+        "var:CUSTARCH::WS-ARCH-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_archive.pco",
+          "line": 23,
+          "program": "CUSTARCH",
+          "paragraph": "0000-MAIN",
+          "text": "MOVE CUST-NAME TO WS-ARCH-NAME"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_archive.pco",
+          "line": 14,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "01  WS-ARCH-NAME             PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CUSTTBL::WS-BAL-ENTRY",
+      "title": "WS-BAL-ENTRY is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/cust_table.pco:28. Current PIC holds signed numeric(9.2), but signed numeric(11.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 WS-BAL-ENTRY PIC S9(9)V99 COMP-3",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 WS-BAL-ENTRY OCCURS 100 PIC S9(11)V9(2) COMP-3.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE",
+        "var:CUSTTBL::CUST-BALANCE",
+        "var:CUSTTBL::WS-BAL-ENTRY"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+          "line": 28,
+          "program": "CUSTTBL",
+          "paragraph": "0000-MAIN",
+          "text": "MOVE CUST-BALANCE TO WS-BAL-ENTRY(WS-BAL-IDX)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+          "line": 17,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "05  WS-BAL-ENTRY         PIC S9(9)V99    COMP-3 OCCURS 100 TIMES"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CUSTUPD::RL-BALANCE",
+      "title": "RL-BALANCE is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/cust_update.pco:39. Current PIC holds signed numeric(8.2), but signed numeric(11.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 RL-BALANCE PIC ZZZZZ,ZZZ,ZZ9.99-.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE",
+        "var:CUSTUPD::CUST-BALANCE",
+        "var:CUSTUPD::RL-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 39,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "MOVE CUST-BALANCE     TO RL-BALANCE"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 11,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  RL-BALANCE           PIC ZZ,ZZZ,ZZ9.99-"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CUSTUPD::RL-CUST-NAME",
+      "title": "RL-CUST-NAME is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/cust_update.pco:38. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 RL-CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 05 RL-CUST-NAME PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::RL-CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 38,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "MOVE CUST-NAME        TO RL-CUST-NAME"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 7,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  RL-CUST-NAME         PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CUSTUPD::WS-NAME-KEY",
+      "title": "WS-NAME-KEY is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/cust_update.pco:45. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-NAME-KEY PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-NAME-KEY PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::WS-NAME-KEY"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 45,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "MOVE CUST-NAME        TO WS-NAME-KEY"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 17,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-NAME-KEY              PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CUSTUPD::WS-SNAPSHOT-NAME",
+      "title": "WS-SNAPSHOT-NAME is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/cust_update.pco:46. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [
+        "reference-modification: the offset/length is hard-coded and will not follow the new width."
+      ],
+      "current": "01 WS-SNAPSHOT-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-SNAPSHOT-NAME PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::WS-SNAPSHOT-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 46,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "MOVE CUST-NAME (1:20) TO WS-SNAPSHOT-NAME"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 12,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-SNAPSHOT-NAME         PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:ORDENTRY::ORD-SHIP-NAME",
+      "title": "ORD-SHIP-NAME is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/order_entry.pco:39. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 ORD-SHIP-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 05 ORD-SHIP-NAME PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME",
+        "var:ORDENTRY::ORD-SHIP-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 39,
+          "program": "ORDENTRY",
+          "paragraph": "1000-FETCH",
+          "text": "MOVE CUST-NAME TO ORD-SHIP-NAME"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\ORDERREC.cpy",
+          "line": 7,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "05  ORD-SHIP-NAME        PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:ORDENTRY::WS-SHIP-LABEL",
+      "title": "WS-SHIP-LABEL is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/order_entry.pco:38. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-SHIP-LABEL PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-SHIP-LABEL PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME",
+        "var:ORDENTRY::WS-SHIP-LABEL"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 38,
+          "program": "ORDENTRY",
+          "paragraph": "1000-FETCH",
+          "text": "MOVE CUST-NAME TO WS-SHIP-LABEL"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 13,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "01  WS-SHIP-LABEL            PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:FMTNAME::WS-WORK-NAME",
+      "title": "WS-WORK-NAME is too small for the widened value",
+      "detail": "Reached through a move edge at examples/src/fmtname.pco:16. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [
+        "inspect: INSPECT scans the whole field including trailing spaces, so counts change.",
+        "literal-comparison: the literal is padded to the field width, so a wider field changes the comparison."
+      ],
+      "current": "01 WS-WORK-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-WORK-NAME PIC X(60).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:FMTNAME::LK-CUST-NAME",
+        "var:FMTNAME::WS-WORK-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 16,
+          "program": "FMTNAME",
+          "paragraph": "0000-MAIN",
+          "text": "MOVE LK-CUST-NAME TO WS-WORK-NAME"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 9,
+          "program": "FMTNAME",
+          "paragraph": "",
+          "text": "01  WS-WORK-NAME             PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 17,
+          "program": "FMTNAME",
+          "paragraph": "0000-MAIN",
+          "text": "INSPECT WS-WORK-NAME TALLYING WS-NAME-LEN FOR ALL ' '"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 18,
+          "program": "FMTNAME",
+          "paragraph": "0000-MAIN",
+          "text": "IF WS-WORK-NAME = 'UNKNOWN'"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:FMTNAME::LK-FULL-ADDRESS",
+      "title": "LK-FULL-ADDRESS is too small for the widened value",
+      "detail": "Reached through a string edge at examples/src/fmtname.pco:21. Current PIC holds alphanumeric(70), but alphanumeric(100) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 LK-FULL-ADDRESS PIC X(70) DISPLAY",
+      "required": "alphanumeric(100)",
+      "remediation": "Change to: 01 LK-FULL-ADDRESS PIC X(100).",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:FMTNAME::LK-CUST-NAME",
+        "var:FMTNAME::WS-WORK-NAME",
+        "var:FMTNAME::LK-FULL-ADDRESS"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 21,
+          "program": "FMTNAME",
+          "paragraph": "0000-MAIN",
+          "text": "STRING WS-WORK-NAME DELIMITED BY SIZE INTO LK-FULL-ADDRESS"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 13,
+          "program": "FMTNAME",
+          "paragraph": "",
+          "text": "01  LK-FULL-ADDRESS          PIC X(70)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "host-variable",
+      "node": "var:CUSTUPD::WS-SEARCH-NAME",
+      "title": "WS-SEARCH-NAME is too small for the widened value",
+      "detail": "Reached through a sql-predicate edge at examples/src/cust_update.pco:26. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-SEARCH-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-SEARCH-NAME PIC X(60).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::WS-SEARCH-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 26,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-N"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 18,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-SEARCH-NAME           PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "host-variable",
+      "node": "var:ORDENTRY::WS-INVOICE-KEY",
+      "title": "WS-INVOICE-KEY is too small for the widened value",
+      "detail": "Reached through a sql-predicate edge at examples/src/order_entry.pco:21. Current PIC holds alphanumeric(40), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-INVOICE-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 WS-INVOICE-KEY PIC X(60).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::WS-INVOICE-KEY"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 21,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "DECLARE CUST_CUR CURSOR FOR SELECT C.CUST_ID, C.CUST_NAME, O.ORDER_NBR, O.ORDER_TOTAL FROM CUSTOMER C, ORDERS O WHERE C.CUST_ID = O.CUST_ID AND C.CUST_NAME LIKE :WS-INVOICE-KEY"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 14,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "01  WS-INVOICE-KEY           PIC X(40)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "database-column",
+      "node": "col:ORDER_HISTORY.CUST_NAME_SNAP",
+      "title": "ORDER_HISTORY.CUST_NAME_SNAP receives widened data and must grow too",
+      "detail": "A host variable carrying the widened value is bound to this column through a sql-bind edge at examples/src/cust_update.pco:59. Writing the wider value into the current column raises ORA-01401/ORA-12899 or silently truncates. Its current width was inferred from the host variable bound to it, not read from the catalog \u2014 confirm against the real DDL.",
+      "notes": [],
+      "current": "alphanumeric(30) (inferred)",
+      "required": "alphanumeric(60)",
+      "remediation": "ALTER TABLE ORDER_HISTORY MODIFY CUST_NAME_SNAP VARCHAR2(60);",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "col:ORDER_HISTORY.CUST_NAME_SNAP"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 59,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "UPDATE ORDER_HISTORY SET CUST_NAME_SNAP = :CUST-NAME WHERE CUST_ID = :CUST-ID"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:FMTNAME::LK-CUST-NAME",
+      "title": "LK-CUST-NAME is too small for the widened value",
+      "detail": "Reached through a call-arg edge at examples/src/cust_update.pco:47. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 LK-CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 LK-CUST-NAME PIC X(60).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:FMTNAME::LK-CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 47,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "CALL 'FMTNAME' USING CUST-NAME WS-FULL-ADDRESS"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+          "line": 12,
+          "program": "FMTNAME",
+          "paragraph": "",
+          "text": "01  LK-CUST-NAME             PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "database-column",
+      "node": "col:ORDER_AUDIT.AUDIT_CUST_NAME",
+      "title": "ORDER_AUDIT.AUDIT_CUST_NAME receives widened data and must grow too",
+      "detail": "A host variable carrying the widened value is bound to this column through a sql-bind edge at examples/src/cust_update.pco:54. Writing the wider value into the current column raises ORA-01401/ORA-12899 or silently truncates. Its current width was inferred from the host variable bound to it, not read from the catalog \u2014 confirm against the real DDL.",
+      "notes": [],
+      "current": "alphanumeric(30) (inferred)",
+      "required": "alphanumeric(60)",
+      "remediation": "ALTER TABLE ORDER_AUDIT MODIFY AUDIT_CUST_NAME VARCHAR2(60);",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::WS-SNAPSHOT-NAME",
+        "col:ORDER_AUDIT.AUDIT_CUST_NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 54,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "INSERT INTO ORDER_AUDIT (AUDIT_CUST_ID, AUDIT_CUST_NAME, AUDIT_TEXT) VALUES (:CUST-ID, :WS-SNAPSHOT-NAME, :WS-AUDIT-TEXT)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "database-column",
+      "node": "col:ORDER_SHIP.SHIP_NAME",
+      "title": "ORDER_SHIP.SHIP_NAME receives widened data and must grow too",
+      "detail": "A host variable carrying the widened value is bound to this column through a sql-bind edge at examples/src/order_entry.pco:41. Writing the wider value into the current column raises ORA-01401/ORA-12899 or silently truncates. Its current width was inferred from the host variable bound to it, not read from the catalog \u2014 confirm against the real DDL.",
+      "notes": [],
+      "current": "alphanumeric(30) (inferred)",
+      "required": "alphanumeric(60)",
+      "remediation": "ALTER TABLE ORDER_SHIP MODIFY SHIP_NAME VARCHAR2(60);",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME",
+        "var:ORDENTRY::ORD-SHIP-NAME",
+        "col:ORDER_SHIP.SHIP_NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+          "line": 41,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "INSERT INTO ORDER_SHIP (ORDER_NBR, SHIP_CUST_ID, SHIP_NAME) VALUES (:ORD-NBR, :ORD-CUST-ID, :ORD-SHIP-NAME)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:IOCUSTNM::LK-IO-NAME",
+      "title": "LK-IO-NAME is too small for the widened value",
+      "detail": "Reached through a call-arg edge at examples/src/cust_archive.pco:25. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 LK-IO-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(60)",
+      "remediation": "Change to: 01 LK-IO-NAME PIC X(60).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME",
+        "var:CUSTARCH::WS-ARCH-NAME",
+        "var:IOCUSTNM::LK-IO-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_archive.pco",
+          "line": 25,
+          "program": "CUSTARCH",
+          "paragraph": "0000-MAIN",
+          "text": "CALL WS-PGM-NAME USING WS-ARCH-NAME"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\io_custname.pco",
+          "line": 15,
+          "program": "IOCUSTNM",
+          "paragraph": "",
+          "text": "01  LK-IO-NAME               PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "database-column",
+      "node": "col:CUST_ARCHIVE.ARCH_NAME",
+      "title": "CUST_ARCHIVE.ARCH_NAME receives widened data and must grow too",
+      "detail": "A host variable carrying the widened value is bound to this column through a sql-bind edge at examples/src/io_custname.pco:18. Writing the wider value into the current column raises ORA-01401/ORA-12899 or silently truncates. Its current width was inferred from the host variable bound to it, not read from the catalog \u2014 confirm against the real DDL.",
+      "notes": [],
+      "current": "alphanumeric(30) (inferred)",
+      "required": "alphanumeric(60)",
+      "remediation": "ALTER TABLE CUST_ARCHIVE MODIFY ARCH_NAME VARCHAR2(60);",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME",
+        "var:CUSTARCH::WS-ARCH-NAME",
+        "var:IOCUSTNM::LK-IO-NAME",
+        "col:CUST_ARCHIVE.ARCH_NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\io_custname.pco",
+          "line": 18,
+          "program": "IOCUSTNM",
+          "paragraph": "",
+          "text": "INSERT INTO CUST_ARCHIVE (ARCH_NAME) VALUES (:LK-IO-NAME)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:CUSTUPD::WS-REPORT-FLAT",
+      "title": "WS-REPORT-FLAT is too small for the widened value",
+      "detail": "Reached through a redefines edge at examples/copybooks/WSCOMMON.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(113) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-REPORT-FLAT PIC X(83) DISPLAY",
+      "required": "alphanumeric(113)",
+      "remediation": "Change to: 01 WS-REPORT-FLAT REDEFINES WS-REPORT-LINE PIC X(113).",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::RL-CUST-NAME",
+        "var:CUSTUPD::WS-REPORT-LINE",
+        "var:CUSTUPD::WS-REPORT-FLAT"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 15,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-REPORT-FLAT  REDEFINES  WS-REPORT-LINE  PIC X(83)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 15,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-REPORT-FLAT  REDEFINES  WS-REPORT-LINE  PIC X(83)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:CUSTUPD::WS-FULL-ADDRESS",
+      "title": "WS-FULL-ADDRESS is too small for the widened value",
+      "detail": "Reached through a call-arg edge at examples/src/cust_update.pco:47. Current PIC holds alphanumeric(70), but alphanumeric(100) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 WS-FULL-ADDRESS PIC X(70) DISPLAY",
+      "required": "alphanumeric(100)",
+      "remediation": "Change to: 01 WS-FULL-ADDRESS PIC X(100).",
+      "hops_from_change": 5,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:FMTNAME::LK-CUST-NAME",
+        "var:FMTNAME::WS-WORK-NAME",
+        "var:FMTNAME::LK-FULL-ADDRESS",
+        "var:CUSTUPD::WS-FULL-ADDRESS"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 47,
+          "program": "CUSTUPD",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "CALL 'FMTNAME' USING CUST-NAME WS-FULL-ADDRESS"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 19,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-FULL-ADDRESS          PIC X(70)"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTARCH::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 144 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "144 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME",
+        "var:CUSTARCH::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTLIST::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 144 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "144 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTLIST::CUST-NAME",
+        "var:CUSTLIST::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTLIST",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTLIST",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTTBL::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 116 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "116 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE",
+        "var:CUSTTBL::CUST-BALANCE",
+        "var:CUSTTBL::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 11,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "05  CUST-BALANCE         PIC S9(9)V99    COMP-3"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTUPD::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 144 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "144 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:ORDENTRY::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 144 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "144 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME",
+        "var:ORDENTRY::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 6,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+          "line": 4,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTTBL::WS-BAL-TABLE",
+      "title": "WS-BAL-TABLE: record length grows 600 -> 602 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "600 bytes",
+      "required": "602 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE",
+        "var:CUSTTBL::CUST-BALANCE",
+        "var:CUSTTBL::WS-BAL-ENTRY",
+        "var:CUSTTBL::WS-BAL-TABLE"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+          "line": 17,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "05  WS-BAL-ENTRY         PIC S9(9)V99    COMP-3 OCCURS 100 TIMES"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+          "line": 16,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "01  WS-BAL-TABLE"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTUPD::WS-REPORT-LINE",
+      "title": "WS-REPORT-LINE: record length grows 83 -> 113 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [
+        "display: report or log column alignment shifts."
+      ],
+      "current": "83 bytes",
+      "required": "113 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::RL-CUST-NAME",
+        "var:CUSTUPD::WS-REPORT-LINE"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 7,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  RL-CUST-NAME         PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy",
+          "line": 4,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  WS-REPORT-LINE"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+          "line": 52,
+          "program": "CUSTUPD",
+          "paragraph": "3000-WRITE-AUDIT",
+          "text": "DISPLAY WS-REPORT-LINE"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:ORDENTRY::ORDER-REC",
+      "title": "ORDER-REC: record length grows 47 -> 77 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "47 bytes",
+      "required": "77 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME",
+        "var:ORDENTRY::ORD-SHIP-NAME",
+        "var:ORDENTRY::ORDER-REC"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\ORDERREC.cpy",
+          "line": 7,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "05  ORD-SHIP-NAME        PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\ORDERREC.cpy",
+          "line": 4,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "01  ORDER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "INFO",
+      "category": "requested-change",
+      "node": "col:CUSTOMER.CUST_BALANCE",
+      "title": "CUSTOMER.CUST_BALANCE: NUMBER(11,2) -> NUMBER(13,2)",
+      "detail": "The change you asked about. Everything below follows from it.",
+      "notes": [],
+      "current": "signed numeric(9.2)",
+      "required": "signed numeric(11.2)",
+      "remediation": "ALTER TABLE CUSTOMER MODIFY CUST_BALANCE NUMBER(13,2);",
+      "hops_from_change": 0,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_BALANCE"
+      ],
+      "references": []
+    },
+    {
+      "severity": "INFO",
+      "category": "requested-change",
+      "node": "col:CUSTOMER.CUST_NAME",
+      "title": "CUSTOMER.CUST_NAME: VARCHAR2(30) -> VARCHAR2(60)",
+      "detail": "The change you asked about. Everything below follows from it.",
+      "notes": [],
+      "current": "alphanumeric(30)",
+      "required": "alphanumeric(60)",
+      "remediation": "ALTER TABLE CUSTOMER MODIFY CUST_NAME VARCHAR2(60);",
+      "hops_from_change": 0,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME"
+      ],
+      "references": []
+    }
+  ],
+  "programs": [
+    {
+      "name": "CUSTARCH",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_archive.pco",
+      "sql_statements": 2,
+      "data_items": 15,
+      "copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ]
+    },
+    {
+      "name": "CUSTLIST",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_list.pco",
+      "sql_statements": 2,
+      "data_items": 14,
+      "copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ]
+    },
+    {
+      "name": "CUSTPURG",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_purge.pco",
+      "sql_statements": 2,
+      "data_items": 14,
+      "copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ]
+    },
+    {
+      "name": "CUSTTBL",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_table.pco",
+      "sql_statements": 2,
+      "data_items": 16,
+      "copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy"
+      ]
+    },
+    {
+      "name": "CUSTUPD",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\cust_update.pco",
+      "sql_statements": 7,
+      "data_items": 29,
+      "copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\WSCOMMON.cpy"
+      ]
+    },
+    {
+      "name": "FMTNAME",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\fmtname.pco",
+      "sql_statements": 0,
+      "data_items": 4,
+      "copybooks": []
+    },
+    {
+      "name": "IOCUSTNM",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\io_custname.pco",
+      "sql_statements": 1,
+      "data_items": 2,
+      "copybooks": []
+    },
+    {
+      "name": "ORDENTRY",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\src\\order_entry.pco",
+      "sql_statements": 10,
+      "data_items": 24,
+      "copybooks": [
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\CUSTOMER.cpy",
+        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\copybooks\\ORDERREC.cpy"
+      ]
+    }
+  ],
+  "warnings": []
+}

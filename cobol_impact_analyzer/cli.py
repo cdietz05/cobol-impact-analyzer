@@ -127,10 +127,16 @@ def build_parser() -> argparse.ArgumentParser:
     out.add_argument("--csv", type=Path, metavar="FILE", help="write CSV findings")
     out.add_argument("--html", type=Path, metavar="FILE", help="write an HTML report")
     out.add_argument(
+        "--summary",
+        type=Path,
+        metavar="FILE",
+        help="write a Markdown summary of the edits needed per source file",
+    )
+    out.add_argument(
         "--out",
         type=Path,
         metavar="DIR",
-        help="write <TABLE>.json, <TABLE>.csv and <TABLE>.html into DIR",
+        help="write <TABLE>.json, <TABLE>.csv, <TABLE>.html and <TABLE>.md into DIR",
     )
     out.add_argument(
         "--include-graph",
@@ -231,6 +237,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 ("json", args.out / f"{stem}.json"),
                 ("csv", args.out / f"{stem}.csv"),
                 ("html", args.out / f"{stem}.html"),
+                ("summary", args.out / f"{stem}.md"),
             ]
         )
     if args.json:
@@ -239,6 +246,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         targets.append(("csv", args.csv))
     if args.html:
         targets.append(("html", args.html))
+    if args.summary:
+        targets.append(("summary", args.summary))
 
     for kind, path in targets:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -246,6 +255,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             report.write_json(result, path, include_graph=args.include_graph)
         elif kind == "csv":
             report.write_csv(result, path)
+        elif kind == "summary":
+            report.write_summary(result, path)
         else:
             report.write_html(result, path)
         if not args.quiet:

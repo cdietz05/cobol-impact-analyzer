@@ -20,5 +20,7 @@ jobs:
         run: python -m unittest discover -s tests -t . -v
       - name: Run the analyzer against the bundled example
         run: |
-          python -m cobol_impact_analyzer --spec examples/change_spec.json --out out
-          test -s out/impact.json
+          python -m cobol_impact_analyzer --spec examples/change_spec.json --out examples/output
+          for ext in json csv html md; do
+            test -s "examples/output/CUSTOMER.$ext" || { echo "missing CUSTOMER.$ext"; exit 1; }
+          done

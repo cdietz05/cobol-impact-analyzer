@@ -1,4 +1,11 @@
-"""Report rendering: terminal text, JSON, CSV and a self-contained HTML page."""
+"""Report rendering: terminal text, JSON, CSV, a self-contained HTML page, and a
+per-file change summary in Markdown.
+
+The reader wants three things and nothing else: the base value that is changing,
+the trace of where it flows, and — file by file — the edits each module needs.
+The text and HTML renderers are both built around those three sections so the
+same information is never laid out twice.
+"""
 
 from __future__ import annotations
 
@@ -8,10 +15,10 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 from .analyzer import AnalysisResult
-from .models import Finding, NodeKind, Severity
+from .models import Capacity, Finding, Kind, Node, Severity
 from .spec import ChangeSpec
 
 _SEVERITY_ORDER = [
@@ -29,6 +36,9 @@ _SEVERITY_COLOR = {
     Severity.LOW: "#3f6b8a",
     Severity.INFO: "#5b6470",
 }
+
+# Findings that describe a database change, not a source edit in a file.
+_NON_FILE_CATEGORIES = {"requested-change", "coverage-gap", "database-column"}
 
 
 def _timestamp() -> str:
@@ -76,7 +86,7 @@ def write_json(result: AnalysisResult, path: Path, include_graph: bool = False) 
     path.write_text(to_json(result, include_graph), encoding="utf-8")
 
 
-# -- CSV -------------------------------------------------------------------
+# -- CSV -----------------------------------------------------------------------
 
 _CSV_COLUMNS = [
     "severity",
@@ -117,15 +127,206 @@ def write_csv(result: AnalysisResult, path: Path) -> None:
             )
 
 
+# -- shared shaping ----------------------------------------------------------
+
+
+def _plain_name(node_id: str) -> str:
+    """``var:PROG::WS-FOO`` -> ``WS-FOO``; ``col:CUSTOMER.CUST_NAME`` -> that."""
+    body = node_id.split(":", 1)[1] if ":" in node_id else node_id
+    return body.split("::", 1)[1] if "::" in body else body
+
+
+def _module_of(node_id: str, node: Optional[Node], finding: Optional[Finding]) -> str:
+    body = node_id.split(":", 1)[1] if ":" in node_id else node_id
+    if "::" in body:
+        return body.split("::", 1)[0]
+    if node is not None and node.programs:
+        return sorted(node.programs)[0]
+    if finding is not None and finding.refs and finding.refs[0].program:
+        return finding.refs[0].program
+    return ""
+
+
+def _cap_short(cap: Optional[Capacity]) -> str:
+    if cap is None or cap.kind is Kind.UNKNOWN:
+        return "?"
+    if cap.kind.is_numeric():
+        body = f"9({cap.int_digits})"
+        if cap.dec_digits:
+            body += f"V9({cap.dec_digits})"
+        return ("S" + body) if cap.signed else body
+    return f"X({cap.chars})"
+
+
+def _short_path(path: str) -> str:
+    """The file's own name, which is how a maintainer refers to it."""
+    try:
+        return Path(path).name or path
+    except (ValueError, OSError):
+        return path
+
+
+def _rel_path(path: str) -> str:
+    """A path relative to where the report is read, when that is shorter."""
+    import os
+
+    try:
+        rel = os.path.relpath(path)
+        if not rel.startswith(".."):
+            return rel.replace("\\", "/")
+    except (ValueError, OSError):
+        pass
+    return path.replace("\\", "/")
+
+
+def _pretty_path(path: Iterable[str]) -> list[str]:
+    return [_strip_prefix(node_id) for node_id in path]
+
+
+def _strip_prefix(node_id: str) -> str:
+    if node_id.startswith(("col:", "var:")):
+        return node_id[4:]
+    return node_id
+
+
+def _seed_change(result: AnalysisResult, plain: str):
+    for change in result.spec.changes:
+        if change.key == plain:
+            return change
+    return None
+
+
+# -- Flow: one trace tree per base value -----------------------------------
+
+
+def _flow_forest(result: AnalysisResult) -> dict[str, dict]:
+    """Nest every reported route into a forest keyed by its seed column.
+
+    ``result.paths`` already holds one parent-chain per finding (and per seed),
+    so a simple trie over those chains is the whole tree - each field appears
+    once, under the route that reached it.
+    """
+    roots: dict[str, dict] = {}
+    for target, route in result.paths.items():
+        chain = route or [target]
+        children = roots
+        for node_id in chain:
+            node = children.setdefault(node_id, {"id": node_id, "children": {}})
+            children = node["children"]
+    return roots
+
+
+def _flow_line(result: AnalysisResult, by_node: dict[str, Finding], node_id: str) -> tuple[str, str, str, str, str]:
+    """(name, module, width-change, severity or '', location or '')."""
+    node = result.graph.nodes.get(node_id)
+    finding = by_node.get(node_id)
+    name = _plain_name(node_id)
+    module = _module_of(node_id, node, finding)
+    need = result.required.get(node_id)
+    change = ""
+    if node is not None and need is not None and not node.capacity.covers(need):
+        change = f"{_cap_short(node.capacity)} -> {_cap_short(need)}"
+    sev = finding.severity.value if finding is not None else ""
+    loc = ""
+    if finding is not None and finding.refs:
+        loc = finding.refs[0].location()
+    elif node is not None and node.declared_in is not None:
+        loc = node.declared_in.location()
+    return name, module, change, sev, loc
+
+
+# -- Changes by module ----------------------------------------------------
+
+
+def _declaration_ref(result: AnalysisResult, finding: Finding):
+    node = result.graph.nodes.get(finding.node_id)
+    if node is not None and node.declared_in is not None:
+        return node.declared_in
+    if node is not None and node.field_ref is not None and node.field_ref.source is not None:
+        return node.field_ref.source
+    return finding.refs[-1] if finding.refs else None
+
+
+def _changes_by_file(result: AnalysisResult) -> tuple[list[dict], list[tuple[str, list[str]]]]:
+    """Group the source edits by the file they land in, worst file first.
+
+    Returns ``(edit_blocks, recompile_only)``. An edit block is
+    ``{"file", "worst", "edits":[{name, now, to, review, line, severity}]}``.
+    """
+    by_file: dict[str, list[dict]] = {}
+    for finding in result.findings:
+        if finding.category in _NON_FILE_CATEGORIES:
+            continue
+        ref = _declaration_ref(result, finding)
+        if ref is None:
+            continue
+        entry = {
+            "name": _plain_name(finding.node_id),
+            "severity": finding.severity,
+            "line": ref.line,
+        }
+        if finding.remediation.startswith("Change to:"):
+            entry["now"] = finding.current
+            entry["to"] = finding.remediation[len("Change to:") :].strip()
+            entry["review"] = ""
+        else:
+            entry["now"] = ""
+            entry["to"] = ""
+            entry["review"] = f"{finding.title}: {finding.remediation}"
+        by_file.setdefault(ref.path, []).append(entry)
+
+    blocks: list[dict] = []
+    for path, edits in by_file.items():
+        edits.sort(key=lambda item: (item["severity"].rank, item["name"]))
+        # One physical edit per line, however many programs' flows reach it. A
+        # field declared in a shared copybook produces a finding per includer;
+        # they are all the same one-line change to the same file.
+        seen: set[tuple] = set()
+        deduped: list[dict] = []
+        for item in edits:
+            key = (item["name"],) if item["review"] else (
+                item["name"],
+                item["now"],
+                item["to"],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+        edits = deduped
+        blocks.append(
+            {
+                "file": _rel_path(path),
+                "worst": min(item["severity"].rank for item in edits),
+                "edits": edits,
+            }
+        )
+    blocks.sort(key=lambda block: (block["worst"], block["file"]))
+
+    recompile = [
+        (impact.program, [_short_path(book) for book in impact.changed_copybooks])
+        for impact in result.program_impacts
+        if impact.recompile_only
+    ]
+    return blocks, recompile
+
+
+def _untraced(result: AnalysisResult) -> list[Finding]:
+    return [f for f in result.findings if f.category == "coverage-gap"]
+
+
 # -- terminal --------------------------------------------------------------
 
 
 def to_text(result: AnalysisResult, verbose: bool = False) -> str:
+    counts = result.counts
     lines: list[str] = []
-    lines.append("=" * 78)
-    lines.append("COBOL COLUMN WIDENING IMPACT REPORT")
+    lines.append("COBOL COLUMN WIDENING IMPACT")
     lines.append(f"generated {_timestamp()}")
-    lines.append("=" * 78)
+    tally = ", ".join(
+        f"{level.value} {counts[level.value]}" for level in _SEVERITY_ORDER
+    )
+    lines.append(f"{len(result.programs)} program(s) scanned  |  findings: {tally}")
     lines.append("")
 
     lines.append("REQUESTED CHANGES")
@@ -133,90 +334,160 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
         lines.append(f"  {change.key:<40} {change.old_type} -> {change.new_type}")
     lines.append("")
 
-    counts = result.counts
-    lines.append("SUMMARY")
-    lines.append(f"  programs scanned : {len(result.programs)}")
-    lines.append(f"  graph nodes      : {len(result.graph.nodes)}")
-    lines.append(
-        f"  graph edges      : {sum(len(edges) for edges in result.graph.out_edges.values())}"
-    )
-    lines.append(
-        "  findings         : "
-        + ", ".join(f"{level.value} {counts[level.value]}" for level in _SEVERITY_ORDER)
-    )
+    lines.append("FLOW  (where the value moves; [SEVERITY] marks a field that will not hold it)")
+    forest = _flow_forest(result)
+    by_node = {finding.node_id: finding for finding in result.findings}
+
+    def walk(children: dict[str, dict], depth: int) -> None:
+        for node_id, child in children.items():
+            name, module, change, sev, loc = _flow_line(result, by_node, node_id)
+            bits = [name]
+            if change:
+                bits.append(change)
+            if sev:
+                bits.append(f"[{sev}]")
+            if module:
+                bits.append(module)
+            if loc:
+                bits.append(loc)
+            lines.append("  " + "  " * depth + "  ".join(bits))
+            if verbose:
+                finding = by_node.get(node_id)
+                if finding is not None and finding.detail:
+                    lines.append("  " + "  " * (depth + 1) + "why: " + finding.detail)
+            walk(child["children"], depth + 1)
+
+    if not forest:
+        lines.append("  (no COBOL field is reached by this change)")
+    for root_id, root in sorted(forest.items()):
+        plain = _plain_name(root_id)
+        change = _seed_change(result, plain)
+        head = plain
+        if change is not None:
+            head += f"   {change.old_type} -> {change.new_type}"
+        lines.append(f"  {head}")
+        walk(root["children"], 1)
     lines.append("")
 
-    for level in _SEVERITY_ORDER:
-        bucket = [finding for finding in result.findings if finding.severity is level]
-        if not bucket:
-            continue
-        lines.append(f"{level.value} ({len(bucket)})")
-        lines.append("-" * 78)
-        for finding in bucket:
-            lines.append(f"  [{finding.category}] {finding.title}")
-            if finding.current:
-                lines.append(f"      now      : {finding.current}")
-            if finding.required:
-                lines.append(f"      needs    : {finding.required}")
-            if finding.remediation:
-                lines.append(f"      action   : {finding.remediation}")
-            if finding.refs:
-                for ref in finding.refs[:3]:
-                    where = f"{ref.location()}"
-                    if ref.program:
-                        where += f"  ({ref.program}"
-                        where += f" / {ref.paragraph})" if ref.paragraph else ")"
-                    lines.append(f"      at       : {where}")
-            for note in finding.notes:
-                lines.append(f"      also     : {note}")
-            if len(finding.path) > 1:
-                lines.append(f"      path     : {' -> '.join(_pretty_path(finding.path))}")
-            if verbose and finding.detail:
-                lines.append(f"      why      : {finding.detail}")
-            lines.append("")
+    edit_blocks, recompile = _changes_by_file(result)
+    lines.append(f"CHANGES BY MODULE  ({len(edit_blocks)} file(s) to edit)")
+    if not edit_blocks:
+        lines.append("  none - every affected program only needs rebuilding.")
+    for block in edit_blocks:
+        lines.append(f"  {block['file']}")
+        for edit in block["edits"]:
+            if edit["review"]:
+                lines.append(f"      {edit['name']:<24} review: {edit['review']}")
+            else:
+                lines.append(f"      {edit['name']:<24} {edit['now']}")
+                lines.append(f"      {'':<24}   -> {edit['to']}   (line {edit['line']})")
+    if recompile:
         lines.append("")
+        lines.append(f"  RECOMPILE ONLY  ({len(recompile)} — rebuild, no source edit)")
+        for program, books in recompile:
+            lines.append(f"      {program:<20} {', '.join(books)}")
+    lines.append("")
 
-    if result.program_impacts:
-        source_change = [i for i in result.program_impacts if not i.recompile_only]
-        recompile = [i for i in result.program_impacts if i.recompile_only]
-
-        lines.append(f"PROGRAMS NEEDING A SOURCE CHANGE ({len(source_change)})")
-        lines.append("-" * 78)
-        if not source_change:
-            lines.append("  none - every affected program only needs rebuilding.")
-        for impact in source_change:
-            lines.append(f"  {impact.program}")
-            for item in impact.own_work:
-                lines.append(f"      {item}")
-            for copybook in impact.changed_copybooks:
-                lines.append(f"      rebuild against : {_short_path(copybook)}")
-        lines.append("")
-
-        lines.append(f"RECOMPILE ONLY ({len(recompile)})")
-        lines.append("-" * 78)
-        lines.append(
-            "  These include a copybook that changes, so they must be rebuilt. "
-            "Nothing in their own source needs editing."
-        )
-        for impact in recompile:
-            books = ", ".join(_short_path(book) for book in impact.changed_copybooks)
-            lines.append(f"  {impact.program:<20} {books}")
+    untraced = _untraced(result)
+    if untraced:
+        lines.append(f"UNTRACED COLUMNS  ({len(untraced)} — could not follow past here)")
+        for finding in untraced:
+            lines.append(f"  {finding.title}")
         lines.append("")
 
     if result.ddl:
         lines.append("DDL PLAN")
-        lines.append("-" * 78)
         lines.extend(f"  {statement}" for statement in result.ddl)
         lines.append("")
 
-    if result.warnings:
-        lines.append("WARNINGS (coverage gaps — read these before trusting the result)")
-        lines.append("-" * 78)
-        for warning in dict.fromkeys(result.warnings):
+    warnings = list(dict.fromkeys(result.warnings))
+    if warnings:
+        lines.append(f"COVERAGE WARNINGS  ({len(warnings)} — gaps in the trace, not errors)")
+        for warning in warnings:
             lines.append(f"  {warning}")
         lines.append("")
 
     return "\n".join(lines)
+
+
+# -- Markdown summary ----------------------------------------------------------
+
+
+def to_summary(result: AnalysisResult) -> str:
+    counts = result.counts
+    tables = ", ".join(sorted({change.table.upper() for change in result.spec.changes}))
+    lines: list[str] = []
+    lines.append(f"# {tables or 'Column'} widening — changes by file")
+    lines.append("")
+    lines.append(f"_Generated {_timestamp()}._")
+    lines.append("")
+
+    lines.append("## Requested change")
+    lines.append("")
+    for change in result.spec.changes:
+        lines.append(f"- `{change.key}` &nbsp; `{change.old_type}` → `{change.new_type}`")
+    lines.append("")
+    tally = ", ".join(
+        f"{level.value} {counts[level.value]}"
+        for level in _SEVERITY_ORDER
+        if counts[level.value]
+    )
+    lines.append(f"Findings: {tally or 'none'}.")
+    lines.append("")
+
+    edit_blocks, recompile = _changes_by_file(result)
+    lines.append("## Files to edit")
+    lines.append("")
+    if not edit_blocks:
+        lines.append("_None — every affected program only needs rebuilding._")
+        lines.append("")
+    for block in edit_blocks:
+        lines.append(f"### `{block['file']}`")
+        lines.append("")
+        for edit in block["edits"]:
+            if edit["review"]:
+                lines.append(
+                    f"- **{edit['name']}** — {edit['severity'].value} — {edit['review']}"
+                )
+            else:
+                lines.append(
+                    f"- **{edit['name']}** (line {edit['line']}, {edit['severity'].value}): "
+                    f"`{edit['now']}` → `{edit['to']}`"
+                )
+        lines.append("")
+
+    lines.append("## Recompile only (rebuild, no source edit)")
+    lines.append("")
+    if not recompile:
+        lines.append("_None._")
+    for program, books in recompile:
+        lines.append(f"- **{program}** — includes {', '.join(books)}")
+    lines.append("")
+
+    if result.ddl:
+        lines.append("## DDL plan")
+        lines.append("")
+        lines.append("```sql")
+        lines.extend(result.ddl)
+        lines.append("```")
+        lines.append("")
+
+    untraced = _untraced(result)
+    warnings = list(dict.fromkeys(result.warnings))
+    if untraced or warnings:
+        lines.append("## Coverage gaps (not errors — read before trusting a clean run)")
+        lines.append("")
+        for finding in untraced:
+            lines.append(f"- {finding.title}")
+        for warning in warnings:
+            lines.append(f"- {warning}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def write_summary(result: AnalysisResult, path: Path) -> None:
+    path.write_text(to_summary(result), encoding="utf-8")
 
 
 def output_basename(spec: ChangeSpec) -> str:
@@ -225,9 +496,6 @@ def output_basename(spec: ChangeSpec) -> str:
     A directory of impact.json files from six different runs is six files
     nobody can tell apart a week later. Naming them for the table means the
     output says what it is without being opened.
-
-    One table gives its own name; a handful are joined; beyond that the name
-    would be longer than it is useful, so it says how many.
     """
     names = [_slug(table) for table in spec.tables]
     names = [name for name in names if name]
@@ -242,38 +510,8 @@ _MAX_TABLES_IN_NAME = 3
 
 
 def _slug(table: str) -> str:
-    """A table name safe to put in a filename.
-
-    A schema-qualified name carries a dot, which would read as an extension,
-    and shops do put stranger things than that in table names.
-    """
     cleaned = re.sub(r"[^A-Za-z0-9_]+", "_", table).strip("_")
     return cleaned
-
-
-def _html_notes(notes: Iterable[str]) -> str:
-    items = "".join(f"<li>{html.escape(note)}</li>" for note in notes)
-    return f"<ul class='notes'>{items}</ul>" if items else ""
-
-
-def _short_path(path: str) -> str:
-    """The copybook's own name, which is how a maintainer refers to it."""
-    try:
-        return Path(path).name or path
-    except (ValueError, OSError):
-        return path
-
-
-def _pretty_path(path: Iterable[str]) -> list[str]:
-    pretty: list[str] = []
-    for node_id in path:
-        if node_id.startswith("col:"):
-            pretty.append(node_id[4:])
-        elif node_id.startswith("var:"):
-            pretty.append(node_id[4:])
-        else:
-            pretty.append(node_id)
-    return pretty
 
 
 # -- HTML ------------------------------------------------------------------
@@ -299,6 +537,7 @@ _HTML_STYLE = """
   }
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
   margin: 0;
   padding: 32px 24px 64px;
@@ -306,58 +545,159 @@ body {
   color: var(--ink);
   font: 14px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
 }
-/* Wide on purpose. The impacts table carries six columns, two of which hold
-   file paths and propagation routes that are long by nature; at 1180px the
-   last column ("Where") was the one that lost, and a reader who cannot see
-   where a finding lives cannot act on it. */
-main { max-width: 1600px; margin: 0 auto; }
+main { max-width: 1100px; margin: 0 auto; }
 h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
-h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em;
-     color: var(--muted); margin: 36px 0 12px; }
-.meta { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em;
+     color: var(--muted); margin: 40px 0 12px; }
+h3 { font-size: 14px; margin: 22px 0 8px; }
+.meta { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+.muted { color: var(--muted); }
 .panel { background: var(--panel); border: 1px solid var(--line);
-         border-radius: 8px; padding: 16px 18px; }
+         border-radius: 8px; padding: 14px 16px; }
+section { scroll-margin-top: 14px; }
+
 .tiles { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
-.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-        padding: 10px 14px; min-width: 108px; }
-.tile .n { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
-           color: var(--muted); }
+a.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+         padding: 10px 14px; min-width: 104px; text-decoration: none; color: inherit;
+         display: block; }
+a.tile:hover { border-color: var(--accent); }
+a.tile .n { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+a.tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
+            color: var(--muted); }
+
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px;
           background: var(--panel); }
-th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line);
          vertical-align: top; }
 th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
      color: var(--muted); font-weight: 600; white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
 code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
               font-size: 12.5px; }
-.badge { display: inline-block; padding: 1px 8px; border-radius: 999px;
-         font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
-.path { color: var(--muted); font-size: 12px; }
+.mono, .loc { overflow-wrap: anywhere; }
 .loc { color: var(--accent); font-size: 12px; }
-/* Long identifiers and paths have no spaces to break at, so without this a
-   single PROG::FIELD-NAME or a deep source path stretches its column and
-   squeezes every other one. */
-.mono, .loc, .path { overflow-wrap: anywhere; }
-/* The impacts table's own column budget. "What" is the flexible column and
-   will happily eat the table if left alone - the notes and the propagation
-   route both live there. Capping it keeps "Action" and "Where" readable. */
-table.impacts { table-layout: fixed; }
-table.impacts th:nth-child(1), table.impacts td:nth-child(1) { width: 84px; }
-table.impacts th:nth-child(2), table.impacts td:nth-child(2) { width: 40%; }
-table.impacts th:nth-child(3), table.impacts td:nth-child(3) { width: 130px; }
-table.impacts th:nth-child(4), table.impacts td:nth-child(4) { width: 130px; }
-table.impacts th:nth-child(5), table.impacts td:nth-child(5) { width: 22%; }
-table.impacts th:nth-child(6), table.impacts td:nth-child(6) { width: 18%; min-width: 200px; }
-ul.notes { margin: 4px 0 0; padding-left: 16px; color: var(--muted); font-size: 12px; }
-ul.notes li { margin: 2px 0; }
+.badge { display: inline-block; padding: 0 7px; border-radius: 999px;
+         font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap;
+         vertical-align: 1px; }
+.legend { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
+
+/* Flow tree */
+.flowpanel { margin-bottom: 12px; }
+.flowroot { font-weight: 600; margin-bottom: 6px; }
+ul.flow { list-style: none; margin: 0; padding-left: 16px;
+          border-left: 1px solid var(--line); }
+ul.flow li { padding: 3px 0; }
+ul.flow .fname { font-weight: 600; }
+ul.flow .fmod { color: var(--muted); }
+ul.flow .fwid { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+
 ul.plain { list-style: none; padding: 0; margin: 0; }
 ul.plain li { padding: 5px 0; border-bottom: 1px solid var(--line); }
 ul.plain li:last-child { border-bottom: none; }
-.warn { border-left: 3px solid #b8531b; padding-left: 12px; }
+.filehead { font-weight: 600; margin: 16px 0 4px; }
+.editrow { padding: 4px 0; border-bottom: 1px solid var(--line); }
+.editrow:last-child { border-bottom: none; }
+details.warn { background: var(--panel); border: 1px solid var(--line);
+               border-left: 3px solid #b8531b; border-radius: 8px; padding: 10px 14px; }
+details.warn summary { cursor: pointer; font-weight: 600; }
+details.warn ul { margin: 10px 0 0; }
 """
+
+
+def _badge(sev: str) -> str:
+    if not sev:
+        return ""
+    try:
+        colour = _SEVERITY_COLOR[Severity(sev)]
+    except ValueError:
+        colour = "#5b6470"
+    return f"<span class='badge' style='background:{colour}'>{html.escape(sev)}</span>"
+
+
+def _flow_html(result: AnalysisResult) -> str:
+    forest = _flow_forest(result)
+    if not forest:
+        return "<div class='panel'>No COBOL field is reached by this change.</div>"
+    by_node = {finding.node_id: finding for finding in result.findings}
+    parts: list[str] = []
+
+    def render(children: dict[str, dict]) -> str:
+        if not children:
+            return ""
+        items: list[str] = []
+        for node_id, child in children.items():
+            name, module, change, sev, loc = _flow_line(result, by_node, node_id)
+            row = [f"<span class='fname'>{html.escape(name)}</span>"]
+            if change:
+                row.append(f"<span class='fwid'>{html.escape(change)}</span>")
+            if sev:
+                row.append(_badge(sev))
+            if module:
+                row.append(f"<span class='fmod'>{html.escape(module)}</span>")
+            if loc:
+                row.append(f"<span class='loc'>{html.escape(loc)}</span>")
+            items.append(
+                "<li>" + " &nbsp; ".join(row) + render(child["children"]) + "</li>"
+            )
+        return "<ul class='flow'>" + "".join(items) + "</ul>"
+
+    for root_id, root in sorted(forest.items()):
+        plain = _plain_name(root_id)
+        change = _seed_change(result, plain)
+        head = html.escape(plain)
+        if change is not None:
+            head += (
+                f" &nbsp; <span class='fwid'>{html.escape(change.old_type)} "
+                f"&rarr; {html.escape(change.new_type)}</span>"
+            )
+        parts.append(
+            f"<div class='panel flowpanel'><div class='flowroot mono'>{head}</div>"
+            + render(root["children"])
+            + "</div>"
+        )
+    return "".join(parts)
+
+
+def _changes_by_file_html(result: AnalysisResult) -> str:
+    edit_blocks, recompile = _changes_by_file(result)
+    parts: list[str] = []
+    if not edit_blocks:
+        parts.append("<div class='panel'>No file needs a source edit — every affected program only needs rebuilding.</div>")
+    for block in edit_blocks:
+        parts.append(f"<div class='filehead mono'>{html.escape(block['file'])}</div>")
+        parts.append("<div class='panel'>")
+        for edit in block["edits"]:
+            if edit["review"]:
+                parts.append(
+                    "<div class='editrow'>"
+                    f"{_badge(edit['severity'].value)} &nbsp; "
+                    f"<strong>{html.escape(edit['name'])}</strong> &nbsp; "
+                    f"<span class='muted'>{html.escape(edit['review'])}</span></div>"
+                )
+            else:
+                parts.append(
+                    "<div class='editrow'>"
+                    f"{_badge(edit['severity'].value)} &nbsp; "
+                    f"<strong>{html.escape(edit['name'])}</strong> "
+                    f"<span class='muted'>line {edit['line']}</span><br>"
+                    f"<span class='mono'>{html.escape(edit['now'])}</span> "
+                    f"&rarr; <span class='mono'>{html.escape(edit['to'])}</span></div>"
+                )
+        parts.append("</div>")
+
+    if recompile:
+        parts.append(
+            f"<div class='filehead'>Recompile only ({len(recompile)}) — rebuild, no source edit</div>"
+        )
+        parts.append("<div class='scroll'><table><tr><th>Program</th><th>Includes</th></tr>")
+        for program, books in recompile:
+            parts.append(
+                f"<tr><td class='mono'>{html.escape(program)}</td>"
+                f"<td class='mono'>{html.escape(', '.join(books))}</td></tr>"
+            )
+        parts.append("</table></div>")
+    return "".join(parts)
 
 
 def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact") -> str:
@@ -368,22 +708,25 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
     parts.append(f"<title>{html.escape(title)}</title>")
     parts.append(f"<style>{_HTML_STYLE}</style></head><body><main>")
     parts.append(f"<h1>{html.escape(title)}</h1>")
+
+    edit_blocks, _ = _changes_by_file(result)
     parts.append(
         f"<p class='meta'>Generated {html.escape(_timestamp())} &middot; "
         f"{len(result.programs)} program(s) scanned &middot; "
-        f"{len(result.graph.nodes)} graph nodes</p>"
+        f"{len(edit_blocks)} file(s) to edit</p>"
     )
 
     parts.append("<div class='tiles'>")
     for level in _SEVERITY_ORDER:
         parts.append(
-            "<div class='tile'>"
+            f"<a class='tile' href='#sev-{level.value.lower()}'>"
             f"<div class='n' style='color:{_SEVERITY_COLOR[level]}'>{counts[level.value]}</div>"
-            f"<div class='k'>{level.value}</div></div>"
+            f"<div class='k'>{level.value}</div></a>"
         )
     parts.append("</div>")
 
-    parts.append("<h2>Requested changes</h2><div class='scroll'><table>")
+    # 1. the base value
+    parts.append("<h2>Requested change</h2><div class='scroll'><table>")
     parts.append("<tr><th>Column</th><th>From</th><th>To</th><th>DDL</th></tr>")
     for change in result.spec.changes:
         parts.append(
@@ -396,41 +739,18 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
         )
     parts.append("</table></div>")
 
-    parts.append("<h2>Impacts</h2>")
-    if not result.findings:
-        parts.append("<div class='panel'>No impacts found for this change.</div>")
-    else:
-        parts.append("<div class='scroll'><table class='impacts'>")
-        parts.append(
-            "<tr><th>Sev</th><th>What</th><th>Now</th><th>Needs</th>"
-            "<th>Action</th><th>Where</th></tr>"
-        )
-        for finding in result.findings:
-            colour = _SEVERITY_COLOR[finding.severity]
-            locations = "<br>".join(
-                f"<span class='loc mono'>{html.escape(ref.location())}</span>"
-                for ref in finding.refs[:4]
-            )
-            path = ""
-            if len(finding.path) > 1:
-                trail = html.escape(" -> ".join(_pretty_path(finding.path)))
-                path = f"<div class='path mono'>{trail}</div>"
-            parts.append(
-                "<tr>"
-                f"<td><span class='badge' style='background:{colour}'>"
-                f"{finding.severity.value}</span></td>"
-                f"<td><strong>{html.escape(finding.title)}</strong>"
-                f"<div class='path'>{html.escape(finding.category)} &middot; "
-                f"{finding.distance} hop(s) from the change</div>"
-                f"<div class='path'>{html.escape(finding.detail)}</div>"
-                f"{_html_notes(finding.notes)}{path}</td>"
-                f"<td class='mono'>{html.escape(finding.current)}</td>"
-                f"<td class='mono'>{html.escape(finding.required)}</td>"
-                f"<td class='mono'>{html.escape(finding.remediation)}</td>"
-                f"<td>{locations}</td>"
-                "</tr>"
-            )
-        parts.append("</table></div>")
+    # 2. the trace
+    parts.append("<h2>Flow</h2>")
+    parts.append(
+        "<p class='legend'>Where the value moves. A badge marks a field that "
+        "cannot hold the widened value; COBOL truncates it silently — characters "
+        "on the right, digits on the left, no runtime error.</p>"
+    )
+    parts.append(_flow_html(result))
+
+    # 3. the per-module edits
+    parts.append("<h2>Changes by module</h2>")
+    parts.append(_changes_by_file_html(result))
 
     if result.ddl:
         parts.append("<h2>DDL plan</h2><div class='panel'><ul class='plain'>")
@@ -438,24 +758,50 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
             parts.append(f"<li class='mono'>{html.escape(statement)}</li>")
         parts.append("</ul></div>")
 
-    parts.append("<h2>Programs scanned</h2><div class='scroll'><table>")
-    parts.append("<tr><th>Program</th><th>Path</th><th>SQL</th><th>Data items</th></tr>")
-    for program in result.programs:
+    # 4. severity index — the tiles jump here
+    parts.append("<h2>Findings by severity</h2>")
+    for level in _SEVERITY_ORDER:
+        bucket = [f for f in result.findings if f.severity is level]
+        parts.append(f"<section id='sev-{level.value.lower()}'>")
         parts.append(
-            "<tr>"
-            f"<td class='mono'>{html.escape(program.name)}</td>"
-            f"<td class='mono'>{html.escape(program.path)}</td>"
-            f"<td>{len(program.sql)}</td>"
-            f"<td>{len(program.data.order)}</td>"
-            "</tr>"
+            f"<h3>{level.value} <span class='muted'>({len(bucket)})</span></h3>"
         )
-    parts.append("</table></div>")
+        if not bucket:
+            parts.append("<p class='muted'>none</p></section>")
+            continue
+        parts.append("<div class='scroll'><table>")
+        parts.append("<tr><th>Field</th><th>Now &rarr; needs</th><th>Where</th></tr>")
+        for finding in bucket:
+            where = "<br>".join(
+                f"<span class='loc mono'>{html.escape(ref.location())}</span>"
+                for ref in finding.refs[:2]
+            )
+            parts.append(
+                "<tr>"
+                f"<td><strong>{html.escape(_plain_name(finding.node_id))}</strong> "
+                f"<span class='muted'>{html.escape(finding.category)}</span></td>"
+                f"<td class='mono'>{html.escape(finding.current)} &rarr; "
+                f"{html.escape(finding.required)}</td>"
+                f"<td>{where}</td>"
+                "</tr>"
+            )
+        parts.append("</table></div></section>")
 
-    if result.warnings:
-        parts.append("<h2>Coverage warnings</h2><div class='panel warn'><ul class='plain'>")
-        for warning in dict.fromkeys(result.warnings):
+    # 5. coverage
+    warnings = list(dict.fromkeys(result.warnings))
+    untraced = _untraced(result)
+    if warnings or untraced:
+        total = len(warnings) + len(untraced)
+        parts.append(
+            f"<h2>Coverage gaps</h2><details class='warn'><summary>{total} "
+            "gap(s) in the trace — not errors, but read them before trusting a clean run"
+            "</summary><ul class='plain'>"
+        )
+        for finding in untraced:
+            parts.append(f"<li>{html.escape(finding.title)}</li>")
+        for warning in warnings:
             parts.append(f"<li class='mono'>{html.escape(warning)}</li>")
-        parts.append("</ul></div>")
+        parts.append("</ul></details>")
 
     parts.append("</main></body></html>")
     return "".join(parts)
