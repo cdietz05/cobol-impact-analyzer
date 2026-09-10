@@ -1,6 +1,6 @@
 # CSS_CUSTOMER widening — changes by file
 
-_Generated 2026-09-10 17:24:41Z._
+_Generated 2026-09-10 17:48:59Z._
 
 ## Requested change
 
@@ -34,10 +34,14 @@ Findings: CRITICAL 25, HIGH 11, MEDIUM 9, INFO 2.
 - **CS-RL-BALANCE** (line 11, CRITICAL): `05 CS-RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY` → `05 CS-RL-BALANCE PIC ZZZZZZZ,ZZZ,ZZ9.99-.`
 - **CS-RL-NAME** (line 7, CRITICAL): `05 CS-RL-NAME PIC X(30) DISPLAY` → `05 CS-RL-NAME PIC X(40).`
 - **CS-SHORT-NAME** (line 20, CRITICAL): `01 CS-SHORT-NAME PIC X(20) DISPLAY` → `01 CS-SHORT-NAME PIC X(40).`
+  - reference-modification: the offset/length is hard-coded and will not follow the new width.
 - **CS-CUST-KEY** (line 18, HIGH): `01 CS-CUST-KEY PIC X(40) DISPLAY` → `01 CS-CUST-KEY PIC X(60).`
 - **CS-RL-FLAT** (line 15, HIGH): `01 CS-RL-FLAT PIC X(83) DISPLAY` → `01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(93).`
+  - overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 93 - check it)
+  - display: report or log column alignment shifts.
 - **CS-SEARCH-NAME** (line 17, HIGH): `01 CS-SEARCH-NAME PIC X(30) DISPLAY` → `01 CS-SEARCH-NAME PIC X(40).`
 - **CS-REPORT-LINE** — MEDIUM — CS-REPORT-LINE: record length grows 83 -> 93 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
+  - overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 93 - check it)
 
 ### `examples/css/copybooks/CSXTRACT.cpy`
 
@@ -60,6 +64,7 @@ Findings: CRITICAL 25, HIGH 11, MEDIUM 9, INFO 2.
 - **WS-FIRST-NAME** (line 12, CRITICAL): `01 WS-FIRST-NAME PIC X(20) DISPLAY` → `01 WS-FIRST-NAME PIC X(40).`
 - **WS-LAST-NAME** (line 11, CRITICAL): `01 WS-LAST-NAME PIC X(20) DISPLAY` → `01 WS-LAST-NAME PIC X(40).`
 - **WS-WORK-NAME** (line 10, CRITICAL): `01 WS-WORK-NAME PIC X(30) DISPLAY` → `01 WS-WORK-NAME PIC X(40).`
+  - inspect: INSPECT scans the whole field including trailing spaces, so counts change.
 - **LK-RAW-NAME** (line 15, HIGH): `01 LK-RAW-NAME PIC X(30) DISPLAY` → `01 LK-RAW-NAME PIC X(40).`
 
 ### `examples/css/src/csnotes.pco`

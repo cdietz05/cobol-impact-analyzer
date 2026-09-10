@@ -329,6 +329,7 @@ def _changes_by_file(result: AnalysisResult) -> tuple[list[dict], list[tuple[str
             "name": _plain_name(finding.node_id),
             "severity": finding.severity,
             "line": ref.line,
+            "notes": list(finding.notes),
         }
         if finding.remediation.startswith("Change to:"):
             entry["now"] = finding.current
@@ -453,6 +454,8 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
             else:
                 lines.append(f"      {edit['name']:<24} {edit['now']}")
                 lines.append(f"      {'':<24}   -> {edit['to']}   (line {edit['line']})")
+            for note in edit.get("notes", []):
+                lines.append(f"      {'':<24} note: {note}")
     if recompile:
         lines.append("")
         lines.append(f"  RECOMPILE ONLY  ({len(recompile)} — rebuild, no source edit)")
@@ -526,6 +529,8 @@ def to_summary(result: AnalysisResult) -> str:
                     f"- **{edit['name']}** (line {edit['line']}, {edit['severity'].value}): "
                     f"`{edit['now']}` → `{edit['to']}`"
                 )
+            for note in edit.get("notes", []):
+                lines.append(f"  - {note}")
         lines.append("")
 
     lines.append("## Recompile only (rebuild, no source edit)")
@@ -760,12 +765,18 @@ def _changes_by_file_html(result: AnalysisResult) -> str:
         parts.append(f"<div class='filehead mono'>{html.escape(block['file'])}</div>")
         parts.append("<div class='panel'>")
         for edit in block["edits"]:
+            note_html = ""
+            if edit.get("notes"):
+                note_html = "<ul class='notes'>" + "".join(
+                    f"<li>{html.escape(n)}</li>" for n in edit["notes"]
+                ) + "</ul>"
             if edit["review"]:
                 parts.append(
                     "<div class='editrow'>"
                     f"{_badge(edit['severity'].value)} &nbsp; "
                     f"<strong>{html.escape(edit['name'])}</strong> &nbsp; "
-                    f"<span class='muted'>{html.escape(edit['review'])}</span></div>"
+                    f"<span class='muted'>{html.escape(edit['review'])}</span>"
+                    f"{note_html}</div>"
                 )
             else:
                 parts.append(
@@ -774,7 +785,8 @@ def _changes_by_file_html(result: AnalysisResult) -> str:
                     f"<strong>{html.escape(edit['name'])}</strong> "
                     f"<span class='muted'>line {edit['line']}</span><br>"
                     f"<span class='mono'>{html.escape(edit['now'])}</span> "
-                    f"&rarr; <span class='mono'>{html.escape(edit['to'])}</span></div>"
+                    f"&rarr; <span class='mono'>{html.escape(edit['to'])}</span>"
+                    f"{note_html}</div>"
                 )
         parts.append("</div>")
 

@@ -1,6 +1,6 @@
 # CUSTOMER widening — changes by file
 
-_Generated 2026-09-10 17:24:41Z._
+_Generated 2026-09-10 17:48:59Z._
 
 ## Requested change
 
@@ -29,8 +29,11 @@ Findings: CRITICAL 16, HIGH 10, MEDIUM 8, INFO 2.
 - **WS-NAME-KEY** (line 17, CRITICAL): `01 WS-NAME-KEY PIC X(30) DISPLAY` → `01 WS-NAME-KEY PIC X(60).`
 - **WS-FULL-ADDRESS** (line 19, HIGH): `01 WS-FULL-ADDRESS PIC X(70) DISPLAY` → `01 WS-FULL-ADDRESS PIC X(100).`
 - **WS-REPORT-FLAT** (line 15, HIGH): `01 WS-REPORT-FLAT PIC X(83) DISPLAY` → `01 WS-REPORT-FLAT REDEFINES WS-REPORT-LINE PIC X(113).`
+  - overlays the same storage (REDEFINES): 01 WS-REPORT-LINE (83 bytes, smaller than the new 113 - check it)
 - **WS-SEARCH-NAME** (line 18, HIGH): `01 WS-SEARCH-NAME PIC X(30) DISPLAY` → `01 WS-SEARCH-NAME PIC X(60).`
 - **WS-REPORT-LINE** — MEDIUM — WS-REPORT-LINE: record length grows 83 -> 113 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
+  - overlays the same storage (REDEFINES): 01 WS-REPORT-FLAT REDEFINES WS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 113 - check it)
+  - display: report or log column alignment shifts.
 
 ### `examples/src/cust_archive.pco`
 
@@ -44,11 +47,14 @@ Findings: CRITICAL 16, HIGH 10, MEDIUM 8, INFO 2.
 ### `examples/src/cust_update.pco`
 
 - **WS-SNAPSHOT-NAME** (line 12, CRITICAL): `01 WS-SNAPSHOT-NAME PIC X(30) DISPLAY` → `01 WS-SNAPSHOT-NAME PIC X(60).`
+  - reference-modification: the offset/length is hard-coded and will not follow the new width.
 
 ### `examples/src/fmtname.pco`
 
 - **LK-FULL-ADDRESS** (line 13, CRITICAL): `01 LK-FULL-ADDRESS PIC X(70) DISPLAY` → `01 LK-FULL-ADDRESS PIC X(100).`
 - **WS-WORK-NAME** (line 9, CRITICAL): `01 WS-WORK-NAME PIC X(30) DISPLAY` → `01 WS-WORK-NAME PIC X(60).`
+  - inspect: INSPECT scans the whole field including trailing spaces, so counts change.
+  - literal-comparison: the literal is padded to the field width, so a wider field changes the comparison.
 - **LK-CUST-NAME** (line 12, HIGH): `01 LK-CUST-NAME PIC X(30) DISPLAY` → `01 LK-CUST-NAME PIC X(60).`
 
 ### `examples/src/order_entry.pco`
