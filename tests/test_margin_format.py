@@ -87,13 +87,15 @@ class MarginRedefinesTests(unittest.TestCase):
             redefines,
         )
 
-    def test_forcing_fixed_drops_the_lines_but_warns(self):
+    def test_margin_lines_are_salvaged_even_when_fixed_is_forced(self):
+        # The level number left of column 8 is never valid card image, so the
+        # declaration is recovered rather than dropped - with a warning.
         result = self._run(FIXED)
-        self.assertNotIn(
+        self.assertIn(
             "var:MARGIN::WV-DATA", {f.node_id for f in result.findings}
         )
         self.assertTrue(
-            any("--format free" in w for w in result.warnings),
+            any("column 8" in w for w in result.warnings),
             result.warnings,
         )
 

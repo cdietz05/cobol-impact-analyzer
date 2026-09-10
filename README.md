@@ -243,11 +243,16 @@ ones that trace cleanly.
 Pro\*COBOL `VARYING`.
 
 Format is auto-detected per file, and a `--format` override now applies to the
-copybooks a file pulls in as well, not just the file itself. A level number
-written left of column 8 (`01   WV-DATA  PIC X.` starting in column 1) is read
-as free format rather than lost to the sequence-number area; if `--format
-fixed` is forced on such a file the skipped declarations are called out in the
-warnings.
+copybooks a file pulls in as well, not just the file itself. A single data item
+whose level number was typed left of column 8 (`01   WV-DATA  PIC X.` starting
+in column 1) is read as free format for that line rather than lost to the
+sequence-number area - even under `--format fixed`, since it is never valid card
+image - and the recovery is noted in the warnings.
+
+When a record grows, every layout that overlays the same bytes through a
+`REDEFINES` is named as a note on the finding, with its size and whether it
+still fits - so a wide flat buffer that happens to be large enough is called
+out instead of passing silently.
 
 **Embedded SQL.** `SELECT ... INTO`, `DECLARE CURSOR` + `FETCH INTO` (the cursor
 select list is carried to the fetch), `INSERT` with an explicit column list,

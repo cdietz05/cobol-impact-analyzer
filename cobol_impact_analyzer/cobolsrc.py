@@ -140,7 +140,7 @@ def parse_lines(
     """Normalise raw text lines. Exposed separately so tests can skip the disk."""
     fmt = source_format or detect_format(raw_lines)
     result: list[LogicalLine] = []
-    dropped_margin: list[int] = []
+    salvaged_margin: list[int] = []
     for index, original in enumerate(raw_lines, start=1):
         line = _expand_tabs(original.rstrip("\r\n"))
         if fmt == FIXED:
@@ -151,17 +151,23 @@ def parse_lines(
                 continue
             indicator = line[_INDICATOR]
             code = line[_CODE_AREA].rstrip()
-            # A data item whose level number was written left of column 8 loses
-            # that level to the sequence area here, so the line no longer looks
-            # like a declaration and is dropped downstream - taking any
-            # REDEFINES or PICTURE on it with it. Record it so the caller can
-            # tell the user to try --format free.
-            if _is_margin_declaration(line) and not _CODE_HAS_LEVEL_RE.match(code):
-                dropped_margin.append(index)
             is_comment = indicator in _COMMENT_INDICATORS
             is_continuation = indicator == _CONTINUATION_INDICATOR
             if indicator == _DEBUG_INDICATOR:
                 is_comment = True
+            # A data item whose level number was typed left of column 8 loses
+            # that level to the sequence area and vanishes downstream, taking any
+            # REDEFINES or PICTURE on it with it. It is never valid card image,
+            # so read it as free format rather than drop it, and note that we
+            # did in case the file really was meant to be fixed.
+            if (
+                not is_comment
+                and _is_margin_declaration(line)
+                and not _CODE_HAS_LEVEL_RE.match(code)
+            ):
+                code = line.strip()
+                is_continuation = False
+                salvaged_margin.append(index)
         else:
             stripped = line.lstrip()
             is_comment = stripped.startswith("*")
@@ -182,12 +188,12 @@ def parse_lines(
                 raw=original,
             )
         )
-    if warnings is not None and dropped_margin:
+    if warnings is not None and salvaged_margin:
         warnings.append(
-            f"{path}: {len(dropped_margin)} line(s) carry a level number before "
-            f"column 8 and were read as card-image sequence text, not declarations "
-            f"(first at line {dropped_margin[0]}); if this file is not fixed-format, "
-            f"re-run with --format free"
+            f"{path}: {len(salvaged_margin)} line(s) carry a level number before "
+            f"column 8 (first at line {salvaged_margin[0]}); read as free format so "
+            f"the declaration is not lost. If this file really is fixed-format, "
+            f"pass --format fixed."
         )
     return result
 
