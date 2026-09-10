@@ -421,9 +421,11 @@ def to_text(result: AnalysisResult, verbose: bool = False) -> str:
             if loc:
                 bits.append(loc)
             lines.append("  " + "  " * depth + "  ".join(bits))
-            if verbose:
-                finding = by_node.get(node_id)
-                if finding is not None and finding.detail:
+            finding = by_node.get(node_id)
+            if finding is not None:
+                for note in finding.notes:
+                    lines.append("  " + "  " * (depth + 1) + "note: " + note)
+                if verbose and finding.detail:
                     lines.append("  " + "  " * (depth + 1) + "why: " + finding.detail)
             walk(child["children"], depth + 1)
 
@@ -662,6 +664,8 @@ ul.flow .fname { font-weight: 600; }
 ul.flow .fmod { color: var(--muted); }
 ul.flow .fwid { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 
+ul.notes { margin: 4px 0 0; padding-left: 16px; color: var(--muted); font-size: 12px; }
+ul.notes li { margin: 2px 0; }
 ul.plain { list-style: none; padding: 0; margin: 0; }
 ul.plain li { padding: 5px 0; border-bottom: 1px solid var(--line); }
 ul.plain li:last-child { border-bottom: none; }
@@ -876,10 +880,15 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
                 f"<span class='loc mono'>{html.escape(ref.location())}</span>"
                 for ref in finding.refs[:2]
             )
+            notes = ""
+            if finding.notes:
+                notes = "<ul class='notes'>" + "".join(
+                    f"<li>{html.escape(note)}</li>" for note in finding.notes
+                ) + "</ul>"
             parts.append(
                 "<tr>"
                 f"<td><strong>{html.escape(_plain_name(finding.node_id))}</strong> "
-                f"<span class='muted'>{html.escape(finding.category)}</span></td>"
+                f"<span class='muted'>{html.escape(finding.category)}</span>{notes}</td>"
                 f"<td class='mono'>{html.escape(finding.current)} &rarr; "
                 f"{html.escape(finding.required)}</td>"
                 f"<td>{where}</td>"

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10 14:55:59Z",
+  "generated_at": "2026-09-10 15:18:55Z",
   "spec": {
     "changes": [
       {
@@ -956,7 +956,9 @@
       "node": "var:CUSTUPD::WS-REPORT-FLAT",
       "title": "WS-REPORT-FLAT is too small for the widened value",
       "detail": "Reached through a redefines edge at examples/copybooks/WSCOMMON.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(113) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 WS-REPORT-LINE (83 bytes, smaller than the new 113 - check it)"
+      ],
       "current": "01 WS-REPORT-FLAT PIC X(83) DISPLAY",
       "required": "alphanumeric(113)",
       "remediation": "Change to: 01 WS-REPORT-FLAT REDEFINES WS-REPORT-LINE PIC X(113).",
@@ -1227,6 +1229,7 @@
       "title": "WS-REPORT-LINE: record length grows 83 -> 113 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [
+        "overlays the same storage (REDEFINES): 01 WS-REPORT-FLAT REDEFINES WS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 113 - check it)",
         "display: report or log column alignment shifts."
       ],
       "current": "83 bytes",

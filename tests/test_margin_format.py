@@ -98,5 +98,41 @@ class MarginRedefinesTests(unittest.TestCase):
         )
 
 
+_BIG_BUFFER = """\
+       01  WV-DATA                     PIC X(4096).
+       01  WV-VIEW  REDEFINES  WV-DATA.
+           03  WV-KEY.
+               05  WV-VALUE            PIC S9(10)V9(2).
+"""
+
+
+class RedefinesNoteTests(unittest.TestCase):
+    """A buffer big enough to still fit is named in a note, not left silent."""
+
+    def _run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "MARGINCB.cpy").write_text(_BIG_BUFFER, encoding="utf-8")
+            (root / "margin.pco").write_text(_PROGRAM, encoding="utf-8")
+            spec = ChangeSpec(
+                changes=[build_change("CUTBLA", "CB_VALUE", "NUMBER(12,2)", "NUMBER(15,2)")],
+                source_paths=[root],
+                copybook_paths=[root],
+                source_patterns=["*.pco"],
+            )
+            return analyze(spec)
+
+    def test_record_layout_finding_names_the_redefined_buffer(self):
+        result = self._run()
+        layout = [
+            f for f in result.findings
+            if f.node_id == "var:MARGIN::WV-VIEW" and f.category == "record-layout"
+        ]
+        self.assertTrue(layout, [f.node_id for f in result.findings])
+        joined = " ".join(layout[0].notes)
+        self.assertIn("WV-DATA", joined)
+        self.assertIn("still fits", joined)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -799,6 +799,7 @@ class ImpactAnalyzer:
                 distance=distance,
                 path=path,
                 refs=refs,
+                notes=self._redefines_notes(node.node_id, new_bytes),
             )
 
         severity = Severity.CRITICAL if edge is not None and edge.kind.truncates else Severity.HIGH
@@ -828,7 +829,47 @@ class ImpactAnalyzer:
             distance=distance,
             path=path,
             refs=refs,
+            notes=self._redefines_notes(node.node_id, max(need.chars, need.text_width)),
         )
+
+    def _redefines_notes(self, node_id: str, new_bytes: int) -> list[str]:
+        """Name the storage this node shares through a REDEFINES, sized or not.
+
+        When a record grows, the layouts that overlay the same bytes are the
+        thing a human most needs pointed at - and a big flat buffer that still
+        happens to fit is exactly the one that gets missed, because it never
+        becomes a finding of its own. Name it here either way.
+        """
+        notes: list[str] = []
+        seen: set[str] = set()
+        edges = list(self.graph.out_edges.get(node_id, []))
+        edges += list(self.graph.in_edges.get(node_id, []))
+        for edge in edges:
+            if edge.kind is not EdgeKind.REDEFINES:
+                continue
+            other_id = edge.target_id if edge.source_id == node_id else edge.source_id
+            if other_id == node_id or other_id in seen:
+                continue
+            seen.add(other_id)
+            other = self.graph.nodes.get(other_id)
+            if other is None:
+                continue
+            entries = self._node_fields.get(other_id, [])
+            other_item = entries[0][1] if entries else other.field_ref
+            size = 0
+            if other_item is not None:
+                size = other_item.storage_bytes or other_item.capacity.chars
+            elif other.capacity.chars:
+                size = other.capacity.chars
+            decl = (other_item.declaration() if other_item is not None else other.name).rstrip(".")
+            if size and size >= new_bytes:
+                verdict = f"{size} bytes, still fits the new {new_bytes}"
+            elif size:
+                verdict = f"{size} bytes, smaller than the new {new_bytes} - check it"
+            else:
+                verdict = f"size unknown - check it covers {new_bytes} bytes"
+            notes.append(f"overlays the same storage (REDEFINES): {decl} ({verdict})")
+        return notes
 
     def _attach_usage_notes(self, findings: list[Finding], impacted: set[str]) -> None:
         """Fold every other mention of an impacted field into its own finding.

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10 14:55:59Z",
+  "generated_at": "2026-09-10 15:18:55Z",
   "spec": {
     "changes": [
       {
@@ -1230,6 +1230,7 @@
       "title": "CS-RL-FLAT is too small for the widened value",
       "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(93) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 93 - check it)",
         "display: report or log column alignment shifts."
       ],
       "current": "01 CS-RL-FLAT PIC X(83) DISPLAY",
@@ -1274,6 +1275,7 @@
       "title": "CS-RL-FLAT is too small for the widened value",
       "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(93) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 93 - check it)",
         "display: report or log column alignment shifts."
       ],
       "current": "01 CS-RL-FLAT PIC X(83) DISPLAY",
@@ -1556,7 +1558,9 @@
       "node": "var:CSBILLCYC::CS-REPORT-LINE",
       "title": "CS-REPORT-LINE: record length grows 83 -> 93 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 93 - check it)"
+      ],
       "current": "83 bytes",
       "required": "93 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
@@ -1624,7 +1628,9 @@
       "node": "var:CSCUSTINQ::CS-REPORT-LINE",
       "title": "CS-REPORT-LINE: record length grows 83 -> 93 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 93 - check it)"
+      ],
       "current": "83 bytes",
       "required": "93 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
