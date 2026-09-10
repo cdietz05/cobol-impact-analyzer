@@ -369,12 +369,13 @@ def load_copybook(
     program: str = "",
     replacing: Optional[Sequence[tuple[str, str]]] = None,
     source_format: str | None = None,
+    warnings: Optional[list[str]] = None,
 ) -> DataMap:
     """Parse a copybook file, applying COPY ... REPLACING substitutions."""
     text = path.read_text(encoding="utf-8", errors="replace")
     if replacing:
         text = apply_replacing(text, replacing)
-    lines = cobolsrc.parse_lines(text.splitlines(), str(path), source_format)
+    lines = cobolsrc.parse_lines(text.splitlines(), str(path), source_format, warnings)
     sentences = list(cobolsrc.iter_sentences(lines))
     return parse_data_sentences(sentences, origin=str(path), program=program)
 

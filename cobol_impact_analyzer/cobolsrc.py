@@ -32,6 +32,24 @@ _COMMENT_INDICATORS = frozenset("*/")
 _DEBUG_INDICATOR = "D"
 _CONTINUATION_INDICATOR = "-"
 
+# A level number whose digits begin left of column 8, followed by whitespace and
+# the start of a name. Card-image fixed format keeps only columns 8-72, so a
+# data item written like this - "01   WV-DATA  PIC X." starting in column 1 -
+# has its level number sitting in the sequence-number area and is silently lost
+# when the file is read as fixed. Seeing these is a strong free-format signal,
+# and worth a warning when the format was forced to fixed anyway.
+_MARGIN_LEVEL_RE = re.compile(r"^ {0,6}(\d{1,2})[ \t]+[A-Za-z0-9]")
+_CODE_HAS_LEVEL_RE = re.compile(r"^\s*\d{1,2}[ \t.]")
+
+
+def _is_margin_declaration(line: str) -> bool:
+    """True when ``line`` starts a data item with its level left of column 8."""
+    match = _MARGIN_LEVEL_RE.match(line)
+    if match is None:
+        return False
+    level = int(match.group(1))
+    return 1 <= level <= 49 or level in (66, 77, 88)
+
 
 @dataclass
 class LogicalLine:
@@ -69,6 +87,7 @@ def detect_format(raw_lines: Sequence[str]) -> str:
     """Guess whether a file is fixed-format card image or free format."""
     considered = 0
     fixed_votes = 0
+    margin_decls = 0
     for line in raw_lines:
         stripped = line.rstrip("\r\n")
         if not stripped.strip():
@@ -76,6 +95,11 @@ def detect_format(raw_lines: Sequence[str]) -> str:
         considered += 1
         if considered > 200:
             break
+        # A level number left of column 8 is never valid card image. One could
+        # be a fluke; a handful means the file is free format (or hand-shifted),
+        # and reading it as fixed would quietly drop those declarations.
+        if _is_margin_declaration(stripped):
+            margin_decls += 1
         if len(stripped) < 7:
             continue
         sequence = stripped[_SEQ_AREA]
@@ -88,6 +112,8 @@ def detect_format(raw_lines: Sequence[str]) -> str:
             fixed_votes += 1
     if considered == 0:
         return FREE
+    if margin_decls >= 2 or (margin_decls and margin_decls * 10 >= considered):
+        return FREE
     return FIXED if fixed_votes / considered >= 0.75 else FREE
 
 
@@ -95,20 +121,26 @@ def _expand_tabs(line: str) -> str:
     return line.replace("\t", "    ")
 
 
-def read_lines(path: Path, source_format: str | None = None) -> list[LogicalLine]:
+def read_lines(
+    path: Path,
+    source_format: str | None = None,
+    warnings: list[str] | None = None,
+) -> list[LogicalLine]:
     """Read a source file into logical lines, dropping comments and card noise."""
     raw = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    return parse_lines(raw, str(path), source_format)
+    return parse_lines(raw, str(path), source_format, warnings)
 
 
 def parse_lines(
     raw_lines: Sequence[str],
     path: str,
     source_format: str | None = None,
+    warnings: list[str] | None = None,
 ) -> list[LogicalLine]:
     """Normalise raw text lines. Exposed separately so tests can skip the disk."""
     fmt = source_format or detect_format(raw_lines)
     result: list[LogicalLine] = []
+    dropped_margin: list[int] = []
     for index, original in enumerate(raw_lines, start=1):
         line = _expand_tabs(original.rstrip("\r\n"))
         if fmt == FIXED:
@@ -119,6 +151,13 @@ def parse_lines(
                 continue
             indicator = line[_INDICATOR]
             code = line[_CODE_AREA].rstrip()
+            # A data item whose level number was written left of column 8 loses
+            # that level to the sequence area here, so the line no longer looks
+            # like a declaration and is dropped downstream - taking any
+            # REDEFINES or PICTURE on it with it. Record it so the caller can
+            # tell the user to try --format free.
+            if _is_margin_declaration(line) and not _CODE_HAS_LEVEL_RE.match(code):
+                dropped_margin.append(index)
             is_comment = indicator in _COMMENT_INDICATORS
             is_continuation = indicator == _CONTINUATION_INDICATOR
             if indicator == _DEBUG_INDICATOR:
@@ -142,6 +181,13 @@ def parse_lines(
                 is_continuation=is_continuation,
                 raw=original,
             )
+        )
+    if warnings is not None and dropped_margin:
+        warnings.append(
+            f"{path}: {len(dropped_margin)} line(s) carry a level number before "
+            f"column 8 and were read as card-image sequence text, not declarations "
+            f"(first at line {dropped_margin[0]}); if this file is not fixed-format, "
+            f"re-run with --format free"
         )
     return result
 

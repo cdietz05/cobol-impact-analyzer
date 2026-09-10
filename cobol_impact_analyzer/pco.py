@@ -141,14 +141,22 @@ class ProgramParser:
         # fetches a cursor it does not declare itself.
         self.shared_cursors: dict[str, SqlStatement] = {}
         self.sql_analyzer = SqlAnalyzer(self.shared_cursors)
+        # The format the current program is being read with, so its copybooks
+        # are read the same way instead of each auto-detecting on its own few
+        # lines. Only a forced --format is threaded; None still lets each
+        # copybook detect itself.
+        self._source_format: str | None = None
 
     def parse(self, path: Path, source_format: str | None = None) -> Program:
         # A fresh analyzer per program keeps cursor names program-scoped; reused
         # names like C1 would otherwise cross-contaminate column mappings.
         self.sql_analyzer = SqlAnalyzer(self.shared_cursors)
-        lines = cobolsrc.read_lines(path, source_format)
+        self._source_format = source_format
+        card_warnings: list[str] = []
+        lines = cobolsrc.read_lines(path, source_format, warnings=card_warnings)
         name = _program_id(lines) or path.stem.upper()
         program = Program(name=name, path=str(path))
+        program.warnings.extend(card_warnings)
 
         sql_blocks, stripped = _extract_exec_sql(lines)
         for text, ref in sql_blocks:
@@ -233,7 +241,13 @@ class ProgramParser:
             program.warnings.append(f"{path}:{line}: copybook {name} not found on the search path")
             return
         program.copybooks.append(str(resolved))
-        data = cb.load_copybook(resolved, program=program.name, replacing=list(replacing))
+        data = cb.load_copybook(
+            resolved,
+            program=program.name,
+            replacing=list(replacing),
+            source_format=self._source_format,
+            warnings=program.warnings,
+        )
         program.data.merge(data)
 
     def _include(self, program: Program, name: str, ref: SourceRef) -> None:
@@ -246,7 +260,14 @@ class ProgramParser:
             )
             return
         program.copybooks.append(str(resolved))
-        program.data.merge(cb.load_copybook(resolved, program=program.name))
+        program.data.merge(
+            cb.load_copybook(
+                resolved,
+                program=program.name,
+                source_format=self._source_format,
+                warnings=program.warnings,
+            )
+        )
 
     # -- procedure division ----------------------------------------------
 
