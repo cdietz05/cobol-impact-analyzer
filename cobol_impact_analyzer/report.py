@@ -723,8 +723,14 @@ def _flow_html(result: AnalysisResult) -> str:
                 row.append(f"<span class='fmod'>{html.escape(module)}</span>")
             if loc:
                 row.append(f"<span class='loc'>{html.escape(loc)}</span>")
+            finding = by_node.get(node_id)
+            notes = ""
+            if finding is not None and finding.notes:
+                notes = "<ul class='notes'>" + "".join(
+                    f"<li>{html.escape(note)}</li>" for note in finding.notes
+                ) + "</ul>"
             items.append(
-                "<li>" + " &nbsp; ".join(row) + render(child["children"]) + "</li>"
+                "<li>" + " &nbsp; ".join(row) + notes + render(child["children"]) + "</li>"
             )
         return "<ul class='flow'>" + "".join(items) + "</ul>"
 
