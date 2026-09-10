@@ -59,6 +59,24 @@ class SourceFormatTests(unittest.TestCase):
         sentences = list(cobolsrc.iter_sentences(lines))
         self.assertTrue(any(s.text.startswith("01  WV-DATA") for s in sentences), sentences)
 
+    def test_listing_directive_does_not_swallow_the_next_declaration(self):
+        raw = [
+            "               05  WV-PRIOR      PIC S9(4) COMP.",
+            "       EJECT",
+            "      **************************************************",
+            "      *          APPLICATION DATA BLOCK               *",
+            "      **************************************************",
+            "       01  WV-DATA                       PIC X(4096).",
+            "       01  WV-VIEW REDEFINES WV-DATA.",
+        ]
+        lines = cobolsrc.parse_lines(raw, "x.cbl", "fixed")
+        sentences = list(cobolsrc.iter_sentences(lines))
+        self.assertTrue(
+            any(s.text.startswith("01  WV-DATA") for s in sentences),
+            [s.text for s in sentences],
+        )
+        self.assertFalse(any("EJECT" in s.text for s in sentences))
+
     def test_period_inside_a_picture_does_not_end_a_sentence(self):
         lines = cobolsrc.parse_lines(["       05  WS-A PIC ZZ9.99."], "x.cbl", "fixed")
         sentences = list(cobolsrc.iter_sentences(lines))

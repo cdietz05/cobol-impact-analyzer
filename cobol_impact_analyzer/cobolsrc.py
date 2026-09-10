@@ -32,6 +32,12 @@ _COMMENT_INDICATORS = frozenset("*/")
 _DEBUG_INDICATOR = "D"
 _CONTINUATION_INDICATOR = "-"
 
+# Listing-control directives: they emit no code and carry no terminating
+# period, so left in the stream they glue onto the next statement - "EJECT"
+# followed by "01 WV-DATA PIC X." becomes one sentence that starts with a
+# word, not a level number, and the declaration is thrown away with it.
+_LISTING_DIRECTIVES = frozenset({"EJECT", "SKIP1", "SKIP2", "SKIP3"})
+
 # A level number whose digits begin left of column 8, followed by whitespace and
 # the start of a name. Card-image fixed format keeps only columns 8-72, so a
 # data item written like this - "01   WV-DATA  PIC X." starting in column 1 -
@@ -166,6 +172,10 @@ def parse_lines(
                 or set(stripped_code) <= set("*=-+ ")
             ):
                 is_comment = True
+            elif stripped_code.upper().rstrip(".") in _LISTING_DIRECTIVES:
+                # A listing directive is a no-op; drop it to an empty line so it
+                # neither ends nor extends a sentence.
+                code = ""
             # Columns 73-80 are the program identification area and are meant to
             # be ignored. Real code overflows into them all the time, though -
             # a PICTURE or a trailing period pushed past column 72 - and cutting
@@ -204,6 +214,8 @@ def parse_lines(
                 # some shops; only trim when the line is clearly card width.
                 if len(code) > 72 and code[72:].strip() and _looks_like_ident(code[72:]):
                     code = code[:72].rstrip()
+                if code.strip().upper().rstrip(".") in _LISTING_DIRECTIVES:
+                    code = ""
         result.append(
             LogicalLine(
                 text=code,

@@ -14,8 +14,12 @@
        WORKING-STORAGE SECTION.
            EXEC SQL INCLUDE SQLCA END-EXEC.
            EXEC SQL BEGIN DECLARE SECTION END-EXEC.
-        *                                                            *
-        ****************  APPLICATION DATA BLOCK  ********************
+       EJECT
+      **************************************************************
+      *                                                          *
+      *              APPLICATION  DATA  BLOCK                     *
+      *                                                          *
+      **************************************************************
        01  WV-DATA                                  PIC X(4096).
        01  WV-CUTBLA-VIEW REDEFINES WV-DATA.
            03  WV-CUTBLA-HDR.
