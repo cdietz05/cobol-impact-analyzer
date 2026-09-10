@@ -1,0 +1,9 @@
+{
+  "source_paths": ["src"],
+  "copybook_paths": ["src"],
+  "source_patterns": ["*.pco"],
+  "changes": [
+    { "table": "CUTBLA", "column": "CB_VALUE", "from": "NUMBER(12,2)", "to": "NUMBER(15,2)" },
+    { "table": "CUTBLA", "column": "CB_NAME",  "from": "VARCHAR2(30)", "to": "VARCHAR2(50)" }
+  ]
+}

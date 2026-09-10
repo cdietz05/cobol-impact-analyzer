@@ -1,0 +1,28 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. WVLOAD.
+      *****************************************************************
+      * A FLAT BUFFER, THEN AN 01 THAT REDEFINES IT WITH A TYPED     *
+      * LAYOUT.  THE TWO 01 LINES ARE TYPED IN COLUMN 1 - the level  *
+      * number lands in the card-image sequence area.  The analyzer  *
+      * must still see WV-DATA so widening WV-VALUE reaches it.       *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+01           WV-DATA                    PIC X(4096).
+01           WV-CUTBLA-VIEW REDEFINES WV-DATA.
+      03        WV-CUTBLA-KEY.
+               05     WV-VALUE          PIC S9(10)V9(2).
+               05     WV-CUST-NAME      PIC X(30).
+           EXEC SQL END DECLARE SECTION END-EXEC.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT CB_VALUE, CB_NAME
+                 INTO :WV-VALUE, :WV-CUST-NAME
+                 FROM CUTBLA
+                WHERE CB_ID = 1
+           END-EXEC
+           STOP RUN.

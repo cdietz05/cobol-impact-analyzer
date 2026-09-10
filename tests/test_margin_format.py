@@ -16,7 +16,9 @@ from pathlib import Path
 from cobol_impact_analyzer.analyzer import analyze
 from cobol_impact_analyzer.cobolsrc import FIXED, FREE, detect_format
 from cobol_impact_analyzer.models import Severity
-from cobol_impact_analyzer.spec import ChangeSpec, build_change
+from cobol_impact_analyzer.spec import ChangeSpec, build_change, load_spec
+
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 _COPYBOOK = """\
 01           WV-DATA                    PIC X(4096).
@@ -134,6 +136,20 @@ class RedefinesNoteTests(unittest.TestCase):
         joined = " ".join(layout[0].notes)
         self.assertIn("WV-DATA", joined)
         self.assertIn("still fits", joined)
+
+
+class BundledRedefinesExampleTests(unittest.TestCase):
+    def test_wv_data_is_reported(self):
+        spec = load_spec(EXAMPLES / "redefines" / "change_spec.json")
+        result = analyze(spec)
+        by_name = {
+            f.node_id.split("::")[-1]: f for f in result.findings
+        }
+        self.assertIn("WV-DATA", by_name)
+        self.assertEqual(by_name["WV-DATA"].severity, Severity.HIGH)
+        self.assertFalse(
+            [w for w in result.warnings if "coverage" in w.lower()], result.warnings
+        )
 
 
 if __name__ == "__main__":

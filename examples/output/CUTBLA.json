@@ -1,0 +1,285 @@
+{
+  "generated_at": "2026-09-10 16:15:21Z",
+  "spec": {
+    "changes": [
+      {
+        "table": "CUTBLA",
+        "column": "CB_VALUE",
+        "old_type": "NUMBER(12,2)",
+        "new_type": "NUMBER(15,2)",
+        "old_capacity": "signed numeric(10.2)",
+        "new_capacity": "signed numeric(13.2)",
+        "alter": "ALTER TABLE CUTBLA MODIFY CB_VALUE NUMBER(15,2);"
+      },
+      {
+        "table": "CUTBLA",
+        "column": "CB_NAME",
+        "old_type": "VARCHAR2(30)",
+        "new_type": "VARCHAR2(50)",
+        "old_capacity": "alphanumeric(30)",
+        "new_capacity": "alphanumeric(50)",
+        "alter": "ALTER TABLE CUTBLA MODIFY CB_NAME VARCHAR2(50);"
+      }
+    ],
+    "source_paths": [
+      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src"
+    ],
+    "copybook_paths": [
+      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src"
+    ],
+    "source_patterns": [
+      "*.pco",
+      "*.PCO"
+    ],
+    "copybook_suffixes": [],
+    "max_depth": 0
+  },
+  "summary": {
+    "programs_scanned": 1,
+    "nodes": 7,
+    "edges": 7,
+    "findings": {
+      "CRITICAL": 2,
+      "HIGH": 1,
+      "MEDIUM": 2,
+      "LOW": 0,
+      "INFO": 2
+    },
+    "programs_affected": 1,
+    "programs_recompile_only": 0
+  },
+  "ddl_plan": [
+    "ALTER TABLE CUTBLA MODIFY CB_VALUE NUMBER(15,2);",
+    "ALTER TABLE CUTBLA MODIFY CB_NAME VARCHAR2(50);"
+  ],
+  "program_impacts": [
+    {
+      "program": "WVLOAD",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [],
+      "own_work": [
+        "WV-CUST-NAME must widen (alphanumeric(30) -> alphanumeric(50))",
+        "WV-CUTBLA-KEY must widen (group(42) -> group(62))",
+        "WV-CUTBLA-VIEW must widen (group(42) -> group(62))",
+        "WV-DATA must widen (alphanumeric(4096) -> alphanumeric(4116))",
+        "WV-VALUE must widen (signed numeric(10.2) -> signed numeric(13.2))"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:WVLOAD::WV-CUST-NAME",
+      "title": "WV-CUST-NAME is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/redefines/src/wvload.pco:22. Current PIC holds alphanumeric(30), but alphanumeric(50) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 WV-CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(50)",
+      "remediation": "Change to: 05 WV-CUST-NAME PIC X(50).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUTBLA.CB_NAME",
+        "var:WVLOAD::WV-CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 22,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "SELECT CB_VALUE, CB_NAME INTO :WV-VALUE, :WV-CUST-NAME FROM CUTBLA WHERE CB_ID = 1"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 18,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "05     WV-CUST-NAME      PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "host-variable",
+      "node": "var:WVLOAD::WV-VALUE",
+      "title": "WV-VALUE is too small for the widened value",
+      "detail": "Reached through a sql-fetch edge at examples/redefines/src/wvload.pco:22. Current PIC holds signed numeric(10.2), but signed numeric(13.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 WV-VALUE PIC S9(10)V9(2) DISPLAY",
+      "required": "signed numeric(13.2)",
+      "remediation": "Change to: 05 WV-VALUE PIC S9(13)V9(2).",
+      "hops_from_change": 1,
+      "propagation_path": [
+        "col:CUTBLA.CB_VALUE",
+        "var:WVLOAD::WV-VALUE"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 22,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "SELECT CB_VALUE, CB_NAME INTO :WV-VALUE, :WV-CUST-NAME FROM CUTBLA WHERE CB_ID = 1"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 17,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "05     WV-VALUE          PIC S9(10)V9(2)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:WVLOAD::WV-DATA",
+      "title": "WV-DATA is too small for the widened value",
+      "detail": "Reached through a redefines edge at examples/redefines/src/wvload.pco:15. Current PIC holds alphanumeric(4096), but alphanumeric(4116) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 WV-CUTBLA-VIEW REDEFINES WV-DATA (42 bytes, smaller than the new 4116 - check it)"
+      ],
+      "current": "01 WV-DATA PIC X(4096) DISPLAY",
+      "required": "alphanumeric(4116)",
+      "remediation": "Change to: 01 WV-DATA PIC X(4116).",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CUTBLA.CB_NAME",
+        "var:WVLOAD::WV-CUST-NAME",
+        "var:WVLOAD::WV-CUTBLA-KEY",
+        "var:WVLOAD::WV-CUTBLA-VIEW",
+        "var:WVLOAD::WV-DATA"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 15,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "01           WV-CUTBLA-VIEW REDEFINES WV-DATA"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 14,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "01           WV-DATA                    PIC X(4096)"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:WVLOAD::WV-CUTBLA-KEY",
+      "title": "WV-CUTBLA-KEY: record length grows 42 -> 62 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "42 bytes",
+      "required": "62 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUTBLA.CB_NAME",
+        "var:WVLOAD::WV-CUST-NAME",
+        "var:WVLOAD::WV-CUTBLA-KEY"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 18,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "05     WV-CUST-NAME      PIC X(30)"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 16,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "03        WV-CUTBLA-KEY"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:WVLOAD::WV-CUTBLA-VIEW",
+      "title": "WV-CUTBLA-VIEW: record length grows 42 -> 62 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 62)"
+      ],
+      "current": "42 bytes",
+      "required": "62 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CUTBLA.CB_NAME",
+        "var:WVLOAD::WV-CUST-NAME",
+        "var:WVLOAD::WV-CUTBLA-KEY",
+        "var:WVLOAD::WV-CUTBLA-VIEW"
+      ],
+      "references": [
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 16,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "03        WV-CUTBLA-KEY"
+        },
+        {
+          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "line": 15,
+          "program": "WVLOAD",
+          "paragraph": "",
+          "text": "01           WV-CUTBLA-VIEW REDEFINES WV-DATA"
+        }
+      ]
+    },
+    {
+      "severity": "INFO",
+      "category": "requested-change",
+      "node": "col:CUTBLA.CB_NAME",
+      "title": "CUTBLA.CB_NAME: VARCHAR2(30) -> VARCHAR2(50)",
+      "detail": "The change you asked about. Everything below follows from it.",
+      "notes": [],
+      "current": "alphanumeric(30)",
+      "required": "alphanumeric(50)",
+      "remediation": "ALTER TABLE CUTBLA MODIFY CB_NAME VARCHAR2(50);",
+      "hops_from_change": 0,
+      "propagation_path": [
+        "col:CUTBLA.CB_NAME"
+      ],
+      "references": []
+    },
+    {
+      "severity": "INFO",
+      "category": "requested-change",
+      "node": "col:CUTBLA.CB_VALUE",
+      "title": "CUTBLA.CB_VALUE: NUMBER(12,2) -> NUMBER(15,2)",
+      "detail": "The change you asked about. Everything below follows from it.",
+      "notes": [],
+      "current": "signed numeric(10.2)",
+      "required": "signed numeric(13.2)",
+      "remediation": "ALTER TABLE CUTBLA MODIFY CB_VALUE NUMBER(15,2);",
+      "hops_from_change": 0,
+      "propagation_path": [
+        "col:CUTBLA.CB_VALUE"
+      ],
+      "references": []
+    }
+  ],
+  "programs": [
+    {
+      "name": "WVLOAD",
+      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+      "sql_statements": 4,
+      "data_items": 5,
+      "copybooks": []
+    }
+  ],
+  "warnings": []
+}

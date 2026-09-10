@@ -22,8 +22,12 @@ jobs:
         run: |
           python -m cobol_impact_analyzer --spec examples/change_spec.json --out examples/output
           python -m cobol_impact_analyzer --spec examples/css/change_spec.json --out examples/output
-          for stem in CUSTOMER CSS_CUSTOMER; do
+          python -m cobol_impact_analyzer --spec examples/redefines/change_spec.json --out examples/output
+          for stem in CUSTOMER CSS_CUSTOMER CUTBLA; do
             for ext in json csv html md; do
               test -s "examples/output/$stem.$ext" || { echo "missing $stem.$ext"; exit 1; }
             done
           done
+          python -c "import json,sys; d=json.load(open('examples/output/CUTBLA.json')); \
+            names={f['node'].split('::')[-1] for f in d['findings']}; \
+            sys.exit(0 if 'WV-DATA' in names else 'WV-DATA not reported')"
