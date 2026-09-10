@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10 16:15:21Z",
+  "generated_at": "2026-09-10 16:24:43Z",
   "spec": {
     "changes": [
       {
@@ -36,11 +36,11 @@
   },
   "summary": {
     "programs_scanned": 1,
-    "nodes": 7,
-    "edges": 7,
+    "nodes": 10,
+    "edges": 10,
     "findings": {
       "CRITICAL": 2,
-      "HIGH": 1,
+      "HIGH": 0,
       "MEDIUM": 2,
       "LOW": 0,
       "INFO": 2
@@ -62,8 +62,7 @@
       "own_work": [
         "WV-CUST-NAME must widen (alphanumeric(30) -> alphanumeric(50))",
         "WV-CUTBLA-KEY must widen (group(42) -> group(62))",
-        "WV-CUTBLA-VIEW must widen (group(42) -> group(62))",
-        "WV-DATA must widen (alphanumeric(4096) -> alphanumeric(4116))",
+        "WV-CUTBLA-VIEW must widen (group(50) -> group(70))",
         "WV-VALUE must widen (signed numeric(10.2) -> signed numeric(13.2))"
       ]
     }
@@ -74,7 +73,7 @@
       "category": "host-variable",
       "node": "var:WVLOAD::WV-CUST-NAME",
       "title": "WV-CUST-NAME is too small for the widened value",
-      "detail": "Reached through a sql-fetch edge at examples/redefines/src/wvload.pco:22. Current PIC holds alphanumeric(30), but alphanumeric(50) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a sql-fetch edge at examples/redefines/src/wvload.pco:28. Current PIC holds alphanumeric(30), but alphanumeric(50) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [],
       "current": "05 WV-CUST-NAME PIC X(30) DISPLAY",
       "required": "alphanumeric(50)",
@@ -87,17 +86,17 @@
       "references": [
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 22,
+          "line": 28,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "SELECT CB_VALUE, CB_NAME INTO :WV-VALUE, :WV-CUST-NAME FROM CUTBLA WHERE CB_ID = 1"
         },
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 18,
+          "line": 24,
           "program": "WVLOAD",
           "paragraph": "",
-          "text": "05     WV-CUST-NAME      PIC X(30)"
+          "text": "05  WV-CUST-NAME         PIC X(30)"
         }
       ]
     },
@@ -106,7 +105,7 @@
       "category": "host-variable",
       "node": "var:WVLOAD::WV-VALUE",
       "title": "WV-VALUE is too small for the widened value",
-      "detail": "Reached through a sql-fetch edge at examples/redefines/src/wvload.pco:22. Current PIC holds signed numeric(10.2), but signed numeric(13.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a sql-fetch edge at examples/redefines/src/wvload.pco:28. Current PIC holds signed numeric(10.2), but signed numeric(13.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [],
       "current": "05 WV-VALUE PIC S9(10)V9(2) DISPLAY",
       "required": "signed numeric(13.2)",
@@ -119,54 +118,17 @@
       "references": [
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 22,
+          "line": 28,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "SELECT CB_VALUE, CB_NAME INTO :WV-VALUE, :WV-CUST-NAME FROM CUTBLA WHERE CB_ID = 1"
         },
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 17,
+          "line": 23,
           "program": "WVLOAD",
           "paragraph": "",
-          "text": "05     WV-VALUE          PIC S9(10)V9(2)"
-        }
-      ]
-    },
-    {
-      "severity": "HIGH",
-      "category": "derived-variable",
-      "node": "var:WVLOAD::WV-DATA",
-      "title": "WV-DATA is too small for the widened value",
-      "detail": "Reached through a redefines edge at examples/redefines/src/wvload.pco:15. Current PIC holds alphanumeric(4096), but alphanumeric(4116) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [
-        "overlays the same storage (REDEFINES): 01 WV-CUTBLA-VIEW REDEFINES WV-DATA (42 bytes, smaller than the new 4116 - check it)"
-      ],
-      "current": "01 WV-DATA PIC X(4096) DISPLAY",
-      "required": "alphanumeric(4116)",
-      "remediation": "Change to: 01 WV-DATA PIC X(4116).",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CUTBLA.CB_NAME",
-        "var:WVLOAD::WV-CUST-NAME",
-        "var:WVLOAD::WV-CUTBLA-KEY",
-        "var:WVLOAD::WV-CUTBLA-VIEW",
-        "var:WVLOAD::WV-DATA"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 15,
-          "program": "WVLOAD",
-          "paragraph": "",
-          "text": "01           WV-CUTBLA-VIEW REDEFINES WV-DATA"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 14,
-          "program": "WVLOAD",
-          "paragraph": "",
-          "text": "01           WV-DATA                    PIC X(4096)"
+          "text": "05  WV-VALUE             PIC S9(10)V9(2)"
         }
       ]
     },
@@ -189,17 +151,17 @@
       "references": [
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 18,
+          "line": 24,
           "program": "WVLOAD",
           "paragraph": "",
-          "text": "05     WV-CUST-NAME      PIC X(30)"
+          "text": "05  WV-CUST-NAME         PIC X(30)"
         },
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 16,
+          "line": 22,
           "program": "WVLOAD",
           "paragraph": "",
-          "text": "03        WV-CUTBLA-KEY"
+          "text": "03  WV-CUTBLA-KEY"
         }
       ]
     },
@@ -207,13 +169,13 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:WVLOAD::WV-CUTBLA-VIEW",
-      "title": "WV-CUTBLA-VIEW: record length grows 42 -> 62 bytes",
+      "title": "WV-CUTBLA-VIEW: record length grows 50 -> 70 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [
-        "overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 62)"
+        "overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 70)"
       ],
-      "current": "42 bytes",
-      "required": "62 bytes",
+      "current": "50 bytes",
+      "required": "70 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 3,
       "propagation_path": [
@@ -225,14 +187,14 @@
       "references": [
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 16,
+          "line": 22,
           "program": "WVLOAD",
           "paragraph": "",
-          "text": "03        WV-CUTBLA-KEY"
+          "text": "03  WV-CUTBLA-KEY"
         },
         {
           "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
-          "line": 15,
+          "line": 18,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "01           WV-CUTBLA-VIEW REDEFINES WV-DATA"
@@ -277,7 +239,7 @@
       "name": "WVLOAD",
       "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
       "sql_statements": 4,
-      "data_items": 5,
+      "data_items": 8,
       "copybooks": []
     }
   ],

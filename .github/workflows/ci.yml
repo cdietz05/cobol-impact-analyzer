@@ -29,5 +29,5 @@ jobs:
             done
           done
           python -c "import json,sys; d=json.load(open('examples/output/CUTBLA.json')); \
-            names={f['node'].split('::')[-1] for f in d['findings']}; \
-            sys.exit(0 if 'WV-DATA' in names else 'WV-DATA not reported')"
+            notes=' '.join(n for f in d['findings'] for n in f['notes']); \
+            sys.exit(0 if 'WV-DATA' in notes and 'still fits' in notes else 'WV-DATA overlap note missing')"

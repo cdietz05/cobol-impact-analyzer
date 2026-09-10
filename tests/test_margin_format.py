@@ -20,8 +20,10 @@ from cobol_impact_analyzer.spec import ChangeSpec, build_change, load_spec
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
+# The buffer is exactly the old layout size, so widening the field inside the
+# view forces it to grow - it becomes a finding of its own.
 _COPYBOOK = """\
-01           WV-DATA                    PIC X(4096).
+01           WV-DATA                    PIC X(12).
 01           WV-CUTBLA-VIEW REDEFINES WV-DATA.
       03        WV-CUTBLA-KEY.
                05     WV-VALUE       PIC S9(10)V9(2).
@@ -139,14 +141,21 @@ class RedefinesNoteTests(unittest.TestCase):
 
 
 class BundledRedefinesExampleTests(unittest.TestCase):
-    def test_wv_data_is_reported(self):
+    def test_nested_field_traces_up_and_names_the_oversized_buffer(self):
         spec = load_spec(EXAMPLES / "redefines" / "change_spec.json")
         result = analyze(spec)
-        by_name = {
-            f.node_id.split("::")[-1]: f for f in result.findings
-        }
-        self.assertIn("WV-DATA", by_name)
-        self.assertEqual(by_name["WV-DATA"].severity, Severity.HIGH)
+        by_name = {f.node_id.split("::")[-1]: f for f in result.findings}
+        # The field in the second 03 is reported, and the trace climbs
+        # 05 -> 03 -> 01.
+        self.assertIn("WV-VALUE", by_name)
+        self.assertIn("WV-CUST-NAME", by_name)
+        self.assertIn("WV-CUTBLA-VIEW", by_name)
+        # WV-DATA is 4096 bytes; it already covers the grown record, so it is
+        # NOT a change - but it is named in a note so nobody has to wonder.
+        self.assertNotIn("WV-DATA", by_name)
+        view_notes = " ".join(by_name["WV-CUTBLA-VIEW"].notes)
+        self.assertIn("WV-DATA", view_notes)
+        self.assertIn("still fits", view_notes)
         self.assertFalse(
             [w for w in result.warnings if "coverage" in w.lower()], result.warnings
         )

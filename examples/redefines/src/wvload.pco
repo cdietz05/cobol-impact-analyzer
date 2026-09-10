@@ -2,9 +2,12 @@
        PROGRAM-ID. WVLOAD.
       *****************************************************************
       * A FLAT BUFFER, THEN AN 01 THAT REDEFINES IT WITH A TYPED     *
-      * LAYOUT.  THE TWO 01 LINES ARE TYPED IN COLUMN 1 - the level  *
-      * number lands in the card-image sequence area.  The analyzer  *
-      * must still see WV-DATA so widening WV-VALUE reaches it.       *
+      * LAYOUT OF TWO 03 GROUPS.  THE 01 LINES ARE TYPED IN COLUMN 1 *
+      * so the level number lands in the card-image sequence area.   *
+      * The changing field sits in the SECOND 03: it must trace up   *
+      * 05 -> 03 -> 01, across the REDEFINES to WV-DATA, and WV-DATA  *
+      * (4096 bytes) must be judged already big enough - a note, not  *
+      * a change.                                                    *
       *****************************************************************
        ENVIRONMENT DIVISION.
        DATA DIVISION.
@@ -13,9 +16,12 @@
            EXEC SQL BEGIN DECLARE SECTION END-EXEC.
 01           WV-DATA                    PIC X(4096).
 01           WV-CUTBLA-VIEW REDEFINES WV-DATA.
-      03        WV-CUTBLA-KEY.
-               05     WV-VALUE          PIC S9(10)V9(2).
-               05     WV-CUST-NAME      PIC X(30).
+           03  WV-CUTBLA-HDR.
+               05  WV-REC-TYPE          PIC X(02).
+               05  WV-REC-SEQ           PIC 9(06).
+           03  WV-CUTBLA-KEY.
+               05  WV-VALUE             PIC S9(10)V9(2).
+               05  WV-CUST-NAME         PIC X(30).
            EXEC SQL END DECLARE SECTION END-EXEC.
        PROCEDURE DIVISION.
        0000-MAIN.

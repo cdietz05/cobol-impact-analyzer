@@ -442,11 +442,16 @@ class ImpactAnalyzer:
                 other_id = self._field_nodes.get((program.name, item.redefines))
                 if other_id:
                     ref = item.source or SourceRef(path=program.path, line=0)
+                    # Directional. The overlaid item must be big enough to hold
+                    # the grown redefining layout (redefines) - but the base
+                    # growing does not force the redefining layout up to the
+                    # base's size, it just changes the shared record length
+                    # (redefined-by).
                     self.graph.add_edge(
-                        Edge(other_id, child_id, EdgeKind.REDEFINES, ref, "shares storage")
+                        Edge(child_id, other_id, EdgeKind.REDEFINES, ref, "redefines")
                     )
                     self.graph.add_edge(
-                        Edge(child_id, other_id, EdgeKind.REDEFINES, ref, "shares storage")
+                        Edge(other_id, child_id, EdgeKind.REDEFINES, ref, "redefined-by")
                     )
 
     def _add_call_edges(self) -> None:
@@ -1113,6 +1118,14 @@ def _required_at_target(
     target_current: Capacity,
 ) -> Optional[Capacity]:
     """Capacity the destination of ``edge`` needs, given a widened source."""
+    if edge.kind is EdgeKind.REDEFINES:
+        # redefines: the overlaid item only has to be *big enough* for the grown
+        # layout - a flat buffer that already reserves more than the record uses
+        # needs nothing. redefined-by: the base grew, so the record length grew
+        # by that much; do not inflate this layout to the base's size.
+        if edge.note == "redefined-by":
+            return _grow_by_delta(target_current, source_current, source_required)
+        return target_current.grown_to_hold(source_required)
     if edge.kind in _COMBINING or edge.kind in _LAYOUT:
         return _grow_by_delta(target_current, source_current, source_required)
     if edge.kind is EdgeKind.UNSTRING:

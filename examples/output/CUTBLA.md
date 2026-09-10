@@ -1,23 +1,22 @@
 # CUTBLA widening — changes by file
 
-_Generated 2026-09-10 16:15:21Z._
+_Generated 2026-09-10 16:24:43Z._
 
 ## Requested change
 
 - `CUTBLA.CB_VALUE` &nbsp; `NUMBER(12,2)` → `NUMBER(15,2)`
 - `CUTBLA.CB_NAME` &nbsp; `VARCHAR2(30)` → `VARCHAR2(50)`
 
-Findings: CRITICAL 2, HIGH 1, MEDIUM 2, INFO 2.
+Findings: CRITICAL 2, MEDIUM 2, INFO 2.
 
 ## Files to edit
 
 ### `examples/redefines/src/wvload.pco`
 
-- **WV-CUST-NAME** (line 18, CRITICAL): `05 WV-CUST-NAME PIC X(30) DISPLAY` → `05 WV-CUST-NAME PIC X(50).`
-- **WV-VALUE** (line 17, CRITICAL): `05 WV-VALUE PIC S9(10)V9(2) DISPLAY` → `05 WV-VALUE PIC S9(13)V9(2).`
-- **WV-DATA** (line 14, HIGH): `01 WV-DATA PIC X(4096) DISPLAY` → `01 WV-DATA PIC X(4116).`
+- **WV-CUST-NAME** (line 24, CRITICAL): `05 WV-CUST-NAME PIC X(30) DISPLAY` → `05 WV-CUST-NAME PIC X(50).`
+- **WV-VALUE** (line 23, CRITICAL): `05 WV-VALUE PIC S9(10)V9(2) DISPLAY` → `05 WV-VALUE PIC S9(13)V9(2).`
 - **WV-CUTBLA-KEY** — MEDIUM — WV-CUTBLA-KEY: record length grows 42 -> 62 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
-- **WV-CUTBLA-VIEW** — MEDIUM — WV-CUTBLA-VIEW: record length grows 42 -> 62 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
+- **WV-CUTBLA-VIEW** — MEDIUM — WV-CUTBLA-VIEW: record length grows 50 -> 70 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
 
 ## Recompile only (rebuild, no source edit)
 
