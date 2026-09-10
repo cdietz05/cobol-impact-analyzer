@@ -155,6 +155,21 @@ def parse_lines(
             is_continuation = indicator == _CONTINUATION_INDICATOR
             if indicator == _DEBUG_INDICATOR:
                 is_comment = True
+            # Columns 73-80 are the program identification area and are meant to
+            # be ignored. Real code overflows into them all the time, though -
+            # a PICTURE or a trailing period pushed past column 72 - and cutting
+            # there then silently loses the clause. Keep the tail only when the
+            # code area clearly ends mid-statement: an unclosed "(" from a split
+            # PICTURE, or no terminating "." with one waiting in the tail.
+            # A plain sequence number or an identification label (no "(" or ".")
+            # is left where it belongs.
+            if not is_comment:
+                tail = line[72:].strip()
+                if tail:
+                    unclosed = code.count("(") > code.count(")")
+                    spilled = "." not in code and ("." in tail or "(" in tail)
+                    if unclosed or spilled:
+                        code = line[_CODE_AREA.start :].rstrip()
             # A data item whose level number was typed left of column 8 loses
             # that level to the sequence area and vanishes downstream, taking any
             # REDEFINES or PICTURE on it with it. It is never valid card image,

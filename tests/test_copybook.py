@@ -25,6 +25,17 @@ class SourceFormatTests(unittest.TestCase):
         lines = cobolsrc.parse_lines(raw, "x.cbl", "fixed")
         self.assertEqual(lines[0].text.strip(), "01  WS-A     PIC X(10).")
 
+    def test_picture_pushed_past_column_72_is_kept(self):
+        # A PICTURE overflowing into the identification area must not be lost.
+        raw = ["       01  WV-DATA".ljust(74) + "PIC X(4096)."]
+        lines = cobolsrc.parse_lines(raw, "x.cbl", "fixed")
+        self.assertIn("PIC X(4096).", lines[0].text)
+
+    def test_plain_identification_label_is_still_stripped(self):
+        raw = ["       05  WS-B     PIC X(5).".ljust(72) + "JSMITH01"]
+        lines = cobolsrc.parse_lines(raw, "x.cbl", "fixed")
+        self.assertNotIn("JSMITH01", lines[0].text)
+
     def test_comment_lines_are_flagged(self):
         raw = ["      * THIS IS A COMMENT", "       01  WS-A PIC X."]
         lines = cobolsrc.parse_lines(raw, "x.cbl", "fixed")

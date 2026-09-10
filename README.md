@@ -243,11 +243,12 @@ ones that trace cleanly.
 Pro\*COBOL `VARYING`.
 
 Format is auto-detected per file, and a `--format` override now applies to the
-copybooks a file pulls in as well, not just the file itself. A single data item
-whose level number was typed left of column 8 (`01   WV-DATA  PIC X.` starting
-in column 1) is read as free format for that line rather than lost to the
-sequence-number area - even under `--format fixed`, since it is never valid card
-image - and the recovery is noted in the warnings.
+copybooks a file pulls in as well, not just the file itself. Two card-image
+quirks are tolerated rather than silently swallowed: a level number typed left
+of column 8 (`01   WV-DATA  PIC X.` starting in column 1) is read as free format
+for that line even under `--format fixed`, and a `PICTURE` pushed past column 72
+into the identification area is kept when the code area ends mid-clause, instead
+of being cut off (which used to drop the whole declaration).
 
 When a record grows, every layout that overlays the same bytes through a
 `REDEFINES` is named as a note on the finding, with its size and whether it

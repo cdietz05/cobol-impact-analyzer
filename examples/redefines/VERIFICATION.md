@@ -1,9 +1,11 @@
 # REDEFINES example — verification
 
 `wvload.pco`: a flat `01 WV-DATA PIC X(4096)`, then `01 WV-CUTBLA-VIEW
-REDEFINES WV-DATA` with **two `03` groups**. Both `01` lines are typed in
-column 1, so the level number sits in the card-image sequence area. The
-changing field (`WV-VALUE`) is in the **second** `03`.
+REDEFINES WV-DATA` with **two `03` groups**. Shop-style quirks on purpose:
+the `01` lines are typed in column 1 (level number in the sequence area),
+`WV-DATA`'s `PICTURE` is pushed past column 72, and every `05` carries its
+`PICTURE` on the following line. The changing field (`WV-VALUE`) is in the
+**second** `03`.
 
 ```bash
 python -m cobol_impact_analyzer --spec examples/redefines/change_spec.json --out out
