@@ -114,6 +114,20 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     _rule("4. raw source around each REDEFINES and its target")
+    # How the reader classifies each line, for the same file / format.
+    fmt = cobolsrc.detect_format(raw)
+    logical = cobolsrc.parse_lines(raw, str(args.file), fmt)
+    kind_by_line = {}
+    for ll in logical:
+        if ll.is_comment:
+            kind_by_line[ll.line_no] = "COMMENT"
+        elif ll.is_continuation:
+            kind_by_line[ll.line_no] = "CONT"
+        elif not ll.text.strip():
+            kind_by_line[ll.line_no] = "blank "
+        else:
+            kind_by_line[ll.line_no] = "code  "
+
     for f in redefiners:
         for label, ident in (
             (f"REDEFINER {f.name}", f.name),
@@ -131,10 +145,33 @@ def main(argv: list[str] | None = None) -> int:
             where = f"line {first + 1}" if first is not None else "NOT FOUND in raw text"
             print(f"\n  {label}  (first match: {where})")
             if first is not None:
-                lo, hi = max(0, first - 2), min(len(raw), first + 3)
+                lo, hi = max(0, first - 6), min(len(raw), first + 4)
                 for i in range(lo, hi):
                     mark = ">>" if i == first else "  "
-                    print(f"    {mark} {i + 1:>5} |{_visible(raw[i])}")
+                    kind = kind_by_line.get(i + 1, "?     ")
+                    reader = cobolsrc.parse_lines([raw[i]], "x", fmt)[0].text
+                    print(f"    {mark} {i + 1:>5} [{kind}] |{_visible(raw[i])}")
+                    print(f"                    reader sees: |{_visible(reader)}")
+
+    _rule("4b. sentences the reader built near each REDEFINES target line")
+    sentences = list(cobolsrc.iter_sentences(logical))
+    for f in redefiners:
+        tgt_lines = [
+            i + 1
+            for i, ln in enumerate(raw)
+            if ln.strip().split()[:2] == ["01", f.redefines]
+            or ln.strip().split()[:2] == [f.redefines, "REDEFINES"]
+        ]
+        target_line = tgt_lines[0] if tgt_lines else None
+        print(f"\n  {f.redefines}: declaration expected near raw line {target_line}")
+        for s in sentences:
+            if target_line is not None and s.line_no <= target_line <= s.end_line:
+                span = f"lines {s.line_no}-{s.end_line}"
+                print(f"    the sentence covering that line ({span}):")
+                print(f"      |{s.text[:400]}|")
+                break
+        else:
+            print("    NO sentence covers that line - it was dropped as comment/blank")
 
     _rule("5. parser warnings")
     for w in program.warnings or ["(none)"]:

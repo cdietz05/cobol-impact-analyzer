@@ -155,6 +155,17 @@ def parse_lines(
             is_continuation = indicator == _CONTINUATION_INDICATOR
             if indicator == _DEBUG_INDICATOR:
                 is_comment = True
+            # A comment marker that drifted one column off the indicator area,
+            # or a box-border line, is still a comment - no COBOL statement
+            # begins with "*", and a line of only "*=-+ " carries no code. Old
+            # card-image shops produce these constantly and merging them into
+            # the next sentence discards a real declaration with them.
+            stripped_code = code.strip()
+            if stripped_code and (
+                stripped_code[0] in "*/"
+                or set(stripped_code) <= set("*=-+ ")
+            ):
+                is_comment = True
             # Columns 73-80 are the program identification area and are meant to
             # be ignored. Real code overflows into them all the time, though -
             # a PICTURE or a trailing period pushed past column 72 - and cutting

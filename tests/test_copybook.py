@@ -42,6 +42,23 @@ class SourceFormatTests(unittest.TestCase):
         self.assertTrue(lines[0].is_comment)
         self.assertFalse(lines[1].is_comment)
 
+    def test_comment_marker_off_the_indicator_column_still_counts(self):
+        # Old card-image shops draw box borders with the "*" a column or two
+        # right of column 7; merging them into the next sentence would drop a
+        # real declaration.
+        raw = [
+            "        *                                           *",
+            "        *****  APPLICATION DATA BLOCK  **************",
+            "       01  WV-DATA                       PIC X(4096).",
+            "       01  WV-VIEW REDEFINES WV-DATA.",
+        ]
+        lines = cobolsrc.parse_lines(raw, "x.cbl", "fixed")
+        self.assertTrue(lines[0].is_comment)
+        self.assertTrue(lines[1].is_comment)
+        self.assertFalse(lines[2].is_comment)
+        sentences = list(cobolsrc.iter_sentences(lines))
+        self.assertTrue(any(s.text.startswith("01  WV-DATA") for s in sentences), sentences)
+
     def test_period_inside_a_picture_does_not_end_a_sentence(self):
         lines = cobolsrc.parse_lines(["       05  WS-A PIC ZZ9.99."], "x.cbl", "fixed")
         sentences = list(cobolsrc.iter_sentences(lines))
