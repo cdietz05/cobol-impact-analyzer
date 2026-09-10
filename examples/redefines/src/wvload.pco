@@ -2,21 +2,20 @@
        PROGRAM-ID. WVLOAD.
       *****************************************************************
       * A FLAT BUFFER, THEN AN 01 THAT REDEFINES IT WITH A TYPED     *
-      * LAYOUT OF TWO 03 GROUPS.  Shop-style quirks on purpose:      *
-      *  - the 01 lines are typed in column 1 (level in the seq area)*
-      *  - WV-DATA's PICTURE is pushed past column 72                *
-      *  - each 05 carries its PICTURE on the next line              *
-      * The changing field is in the SECOND 03.  The trace must      *
-      * climb 05 -> 03 -> 01, cross the REDEFINES, and judge WV-DATA *
-      * (4096 bytes) already big enough - a note, not a change.      *
+      * LAYOUT OF TWO 03 GROUPS.  Card-image fixed format: 01 in     *
+      * Area A (column 8), each 05's PICTURE on the following line.  *
+      * The changing field (WV-VALUE) is in the SECOND 03.  The      *
+      * trace climbs 05 -> 03 -> 01, crosses the REDEFINES, and      *
+      * judges WV-DATA (4096 bytes) already big enough - a note,     *
+      * not a change.                                                *
       *****************************************************************
        ENVIRONMENT DIVISION.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
            EXEC SQL INCLUDE SQLCA END-EXEC.
            EXEC SQL BEGIN DECLARE SECTION END-EXEC.
-01           WV-DATA                                                  PIC X(4096).
-01           WV-CUTBLA-VIEW REDEFINES WV-DATA.
+       01  WV-DATA                                  PIC X(4096).
+       01  WV-CUTBLA-VIEW REDEFINES WV-DATA.
            03  WV-CUTBLA-HDR.
                05  WV-REC-TYPE
                                PIC X(02).
