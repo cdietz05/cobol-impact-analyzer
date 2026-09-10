@@ -18,9 +18,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Run the test suite
         run: python -m unittest discover -s tests -t . -v
-      - name: Run the analyzer against the bundled example
+      - name: Run the analyzer against the bundled examples
         run: |
           python -m cobol_impact_analyzer --spec examples/change_spec.json --out examples/output
-          for ext in json csv html md; do
-            test -s "examples/output/CUSTOMER.$ext" || { echo "missing CUSTOMER.$ext"; exit 1; }
+          python -m cobol_impact_analyzer --spec examples/css/change_spec.json --out examples/output
+          for stem in CUSTOMER CSS_CUSTOMER; do
+            for ext in json csv html md; do
+              test -s "examples/output/$stem.$ext" || { echo "missing $stem.$ext"; exit 1; }
+            done
           done

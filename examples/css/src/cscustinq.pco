@@ -1,0 +1,61 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSCUSTINQ.
+      *****************************************************************
+      * CSS ONLINE - CUSTOMER INQUIRY.  CURSOR OVER CSS_CUSTOMER BY  *
+      * NAME, BUILDS ONE PRINT LINE PER HIT AND A DISPLAY KEY, AND   *
+      * CALLS THE NAME FORMATTER FOR THE SCREEN HEADER.              *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE CSCUST END-EXEC.
+       01  WS-HITS                  PIC S9(5)       COMP-3.
+           EXEC SQL END DECLARE SECTION END-EXEC.
+           COPY CSWORK.
+       01  WS-FLAGS.
+           05  WS-EOF-FLAG          PIC X(01)  VALUE 'N'.
+               88  WS-EOF                     VALUE 'Y'.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           MOVE 'SMITH%' TO CS-SEARCH-NAME
+           EXEC SQL
+               DECLARE CUST_CUR CURSOR FOR
+               SELECT CUST_ID, CUST_NAME, CUST_CITY, CUST_STATE,
+                      CUST_BALANCE
+                 FROM CSS_CUSTOMER
+                WHERE CUST_NAME LIKE :CS-SEARCH-NAME
+                  AND CUST_STATUS = 'A'
+                ORDER BY CUST_NAME
+           END-EXEC
+           EXEC SQL OPEN CUST_CUR END-EXEC
+           PERFORM 1000-FETCH-ONE UNTIL WS-EOF
+           EXEC SQL CLOSE CUST_CUR END-EXEC
+           STOP RUN.
+
+       1000-FETCH-ONE.
+           EXEC SQL
+               FETCH CUST_CUR
+                INTO :CS-CUST-ID, :CS-CUST-NAME, :CS-CUST-CITY,
+                     :CS-CUST-STATE, :CS-CUST-BALANCE
+           END-EXEC
+           IF SQLCODE NOT = 0
+               SET WS-EOF TO TRUE
+           ELSE
+               ADD 1 TO WS-HITS
+               PERFORM 2000-FORMAT-LINE
+           END-IF.
+
+       2000-FORMAT-LINE.
+           MOVE CS-CUST-ID          TO CS-RL-CUST-ID
+           MOVE CS-CUST-NAME        TO CS-RL-NAME
+           MOVE CS-CUST-BALANCE     TO CS-RL-BALANCE
+           STRING CS-CUST-CITY      DELIMITED BY SPACE
+                  ', '              DELIMITED BY SIZE
+                  CS-CUST-STATE     DELIMITED BY SIZE
+                  INTO CS-RL-CITY-STATE
+           END-STRING
+           MOVE CS-CUST-NAME (1:20) TO CS-SHORT-NAME
+           CALL 'CSFMTNAM' USING CS-CUST-NAME CS-CUST-KEY
+           DISPLAY CS-RL-FLAT.

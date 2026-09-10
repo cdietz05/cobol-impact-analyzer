@@ -1,0 +1,68 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSBILLCYC.
+      *****************************************************************
+      * CSS NIGHTLY - BILLING CYCLE.  WALKS EVERY CUSTOMER IN THE    *
+      * REQUESTED CYCLE, RECOMPUTES THE BALANCE, PRINTS A LINE AND   *
+      * WRITES A FLAT EXTRACT RECORD FOR THE WAREHOUSE LOAD.         *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  EXTRACT-FILE.
+       01  EXTRACT-RECORD          PIC X(80).
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE CSCUST END-EXEC.
+       01  WS-RUN-CYCLE            PIC 9(02).
+           EXEC SQL END DECLARE SECTION END-EXEC.
+           COPY CSWORK.
+           COPY CSXTRACT.
+       01  WS-CYCLE-CHARGES         PIC S9(7)V99    COMP-3.
+       01  WS-NEW-BALANCE           PIC S9(11)V99   COMP-3.
+       01  WS-FLAGS.
+           05  WS-EOF-FLAG          PIC X(01)  VALUE 'N'.
+               88  WS-EOF                     VALUE 'Y'.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           MOVE 07 TO WS-RUN-CYCLE
+           EXEC SQL
+               DECLARE BILL_CUR CURSOR FOR
+               SELECT CUST_ID, CUST_NAME, CUST_BALANCE, CUST_CYCLE
+                 FROM CSS_CUSTOMER
+                WHERE CUST_CYCLE = :WS-RUN-CYCLE
+                  AND CUST_STATUS = 'A'
+           END-EXEC
+           EXEC SQL OPEN BILL_CUR END-EXEC
+           PERFORM 1000-BILL-ONE UNTIL WS-EOF
+           EXEC SQL CLOSE BILL_CUR END-EXEC
+           STOP RUN.
+
+       1000-BILL-ONE.
+           EXEC SQL
+               FETCH BILL_CUR
+                INTO :CS-CUST-ID, :CS-CUST-NAME, :CS-CUST-BALANCE,
+                     :CS-CUST-CYCLE
+           END-EXEC
+           IF SQLCODE NOT = 0
+               SET WS-EOF TO TRUE
+           ELSE
+               MOVE 45.00 TO WS-CYCLE-CHARGES
+               COMPUTE WS-NEW-BALANCE =
+                       CS-CUST-BALANCE + WS-CYCLE-CHARGES
+               PERFORM 2000-PRINT-LINE
+               PERFORM 3000-WRITE-EXTRACT
+           END-IF.
+
+       2000-PRINT-LINE.
+           MOVE CS-CUST-ID      TO CS-RL-CUST-ID
+           MOVE CS-CUST-NAME    TO CS-RL-NAME
+           MOVE WS-NEW-BALANCE  TO CS-RL-BALANCE
+           DISPLAY CS-RL-FLAT.
+
+       3000-WRITE-EXTRACT.
+           MOVE CS-CUST-ID     TO XT-CUST-ID
+           MOVE CS-CUST-NAME   TO XT-CUST-NAME
+           MOVE CS-CUST-CYCLE  TO XT-CYCLE
+           MOVE WS-NEW-BALANCE TO XT-BALANCE
+           WRITE EXTRACT-RECORD FROM CS-XTRACT-REC.

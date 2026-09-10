@@ -1,0 +1,58 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSACCTUPD.
+      *****************************************************************
+      * CSS BATCH - BILLING-NAME SYNC.  FOR ONE CUSTOMER, LOOK UP    *
+      * THE CURRENT NAME, SNAPSHOT IT ONTO EVERY ACCOUNT, AND WRITE  *
+      * AN AUDIT ROW.  TOUCHES CSS_ACCOUNT AND CSS_ACCT_AUDIT.       *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE CSCUST END-EXEC.
+           EXEC SQL INCLUDE CSACCT END-EXEC.
+       01  WS-AUDIT-TEXT            PIC X(80).
+           EXEC SQL END DECLARE SECTION END-EXEC.
+       01  WS-ROWS-DONE             PIC S9(7)       COMP-3.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           MOVE 100045 TO CS-ACCT-CUST-ID
+           PERFORM 1000-GET-NAME
+           PERFORM 2000-SYNC-ACCOUNT
+           PERFORM 3000-WRITE-AUDIT
+           STOP RUN.
+
+       1000-GET-NAME.
+           EXEC SQL
+               SELECT CUST_NAME, CUST_BALANCE
+                 INTO :CS-CUST-NAME, :CS-CUST-BALANCE
+                 FROM CSS_CUSTOMER
+                WHERE CUST_ID = :CS-ACCT-CUST-ID
+           END-EXEC.
+
+       2000-SYNC-ACCOUNT.
+           EXEC SQL
+               SELECT ACCT_NBR, ACCT_BILL_NAME, ACCT_BALANCE
+                 INTO :CS-ACCT-NBR, :CS-ACCT-BILL-NAME, :CS-ACCT-BALANCE
+                 FROM CSS_ACCOUNT
+                WHERE ACCT_CUST_ID = :CS-ACCT-CUST-ID
+           END-EXEC
+           MOVE CS-CUST-NAME TO CS-ACCT-BILL-NAME
+           EXEC SQL
+               UPDATE CSS_ACCOUNT
+                  SET ACCT_BILL_NAME = :CS-ACCT-BILL-NAME
+                WHERE ACCT_CUST_ID = :CS-ACCT-CUST-ID
+           END-EXEC
+           ADD 1 TO WS-ROWS-DONE.
+
+       3000-WRITE-AUDIT.
+           STRING 'REBILL ' DELIMITED BY SIZE
+                  CS-CUST-NAME DELIMITED BY SIZE
+                  INTO WS-AUDIT-TEXT
+           END-STRING
+           EXEC SQL
+               INSERT INTO CSS_ACCT_AUDIT
+                      (AUDIT_ACCT_NBR, AUDIT_BILL_NAME, AUDIT_TEXT)
+               VALUES (:CS-ACCT-NBR, :CS-ACCT-BILL-NAME, :WS-AUDIT-TEXT)
+           END-EXEC.

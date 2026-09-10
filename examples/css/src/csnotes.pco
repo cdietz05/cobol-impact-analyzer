@@ -1,0 +1,22 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSNOTES.
+      *****************************************************************
+      * CSS COMMON - CALLED SUBPROGRAM.  SEEDS A SERVICE ORDER'S     *
+      * TECH-NOTES FIELD WITH A STANDARD HEADER LINE.                *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-NOTE-HEADER          PIC X(30).
+       LINKAGE SECTION.
+       01  LK-CUST-NAME            PIC X(30).
+       01  LK-TECH-NOTES          PIC X(60).
+       PROCEDURE DIVISION USING LK-CUST-NAME LK-TECH-NOTES.
+       0000-MAIN.
+           MOVE LK-CUST-NAME TO WS-NOTE-HEADER
+           STRING 'CUST: '     DELIMITED BY SIZE
+                  LK-CUST-NAME DELIMITED BY SIZE
+                  ' - NEW SERVICE ORDER' DELIMITED BY SIZE
+                  INTO LK-TECH-NOTES
+           END-STRING
+           GOBACK.

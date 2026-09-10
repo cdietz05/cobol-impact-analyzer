@@ -1,0 +1,21 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSCUSTRPT.
+      *****************************************************************
+      * CSS REPORT - PRINTS A CUSTOMER LINE FROM A RECORD ANOTHER    *
+      * MODULE ALREADY FETCHED (PASSED IN THROUGH THE COMMON AREA).  *
+      * NOTHING IN ITS OWN SOURCE BINDS A COLUMN, BUT IT COPIES      *
+      * CSCUST AND CSWORK, SO A WIDENED LAYOUT FORCES A REBUILD.     *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL INCLUDE CSCUST END-EXEC.
+           COPY CSWORK.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           MOVE CS-CUST-ID      TO CS-RL-CUST-ID
+           MOVE CS-CUST-NAME    TO CS-RL-NAME
+           MOVE CS-CUST-BALANCE TO CS-RL-BALANCE
+           DISPLAY CS-RL-FLAT
+           STOP RUN.

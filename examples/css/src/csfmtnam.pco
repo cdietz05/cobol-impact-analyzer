@@ -1,0 +1,30 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSFMTNAM.
+      *****************************************************************
+      * CSS COMMON - CALLED SUBPROGRAM.  TAKES A RAW CUSTOMER NAME   *
+      * ("LAST, FIRST") AND RETURNS A DISPLAY KEY ("FIRST LAST").    *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-WORK-NAME             PIC X(30).
+       01  WS-LAST-NAME             PIC X(20).
+       01  WS-FIRST-NAME            PIC X(20).
+       01  WS-NAME-LEN              PIC S9(4)       COMP.
+       LINKAGE SECTION.
+       01  LK-RAW-NAME              PIC X(30).
+       01  LK-DISPLAY-KEY           PIC X(40).
+       PROCEDURE DIVISION USING LK-RAW-NAME LK-DISPLAY-KEY.
+       0000-MAIN.
+           MOVE LK-RAW-NAME TO WS-WORK-NAME
+           INSPECT WS-WORK-NAME TALLYING WS-NAME-LEN
+                   FOR ALL ' '
+           UNSTRING WS-WORK-NAME DELIMITED BY ','
+               INTO WS-LAST-NAME WS-FIRST-NAME
+           END-UNSTRING
+           STRING WS-FIRST-NAME DELIMITED BY SPACE
+                  ' '           DELIMITED BY SIZE
+                  WS-LAST-NAME  DELIMITED BY SPACE
+                  INTO LK-DISPLAY-KEY
+           END-STRING
+           GOBACK.

@@ -1,0 +1,22 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CSPURGE.
+      *****************************************************************
+      * CSS HOUSEKEEPING - DELETES CLOSED ZERO-BALANCE CUSTOMERS.    *
+      * PREDICATE IS ALL LITERALS, SO NO HOST VARIABLE CARRIES A     *
+      * WIDENED VALUE - BUT IT COPIES CSCUST AND MUST BE REBUILT.    *
+      *****************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+           EXEC SQL INCLUDE CSCUST END-EXEC.
+       01  WS-DELETED              PIC S9(7)       COMP-3.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               DELETE FROM CSS_CUSTOMER
+                WHERE CUST_STATUS = 'C'
+                  AND CUST_BALANCE = 0
+           END-EXEC
+           MOVE SQLERRD(3) TO WS-DELETED
+           STOP RUN.

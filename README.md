@@ -61,6 +61,19 @@ You get `CUSTOMER.json`, `CUSTOMER.csv`, `CUSTOMER.html` and `CUSTOMER.md`
 example is committed under [`examples/output/`](examples/output/) so you can read
 it without running anything.
 
+A second, larger example under [`examples/css/`](examples/css/) models a 1990s
+telecom **Customer Service System** — customer master, accounts, service orders,
+a nightly billing cycle, a flat warehouse extract, and two called subprograms —
+across eight `.pco` sources and five copybooks. It exercises cursor `FETCH`,
+`SELECT INTO`, `INSERT`/`UPDATE` binds, `COMPUTE`, `WRITE FROM`, `REDEFINES`,
+and `CALL ... USING` in both directions:
+
+```bash
+python -m cobol_impact_analyzer --spec examples/css/change_spec.json --out examples/output
+```
+
+writes `CSS_CUSTOMER.{json,csv,html,md}` — also committed under `examples/output/`.
+
 The stdout report has three sections — the base value, the trace, and the edits
 per file:
 
