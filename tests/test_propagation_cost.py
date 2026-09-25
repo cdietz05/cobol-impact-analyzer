@@ -125,12 +125,13 @@ class QueueDedupTests(unittest.TestCase):
         analyzer = _hub_analyzer(feeders=50, fanout=50)
         required, _, _ = analyzer._propagate()
 
-        # The narrowest feeder (10 chars) grew to 60, a delta of 50, and the
-        # hub has to absorb the largest delta any feeder brought it.
-        self.assertEqual(required["var:HUB-0"].chars, 80)
+        # The narrowest feeder (10 chars) grew to 60, but 20 of that is the
+        # 30-char column it was already truncating. The hub absorbs what the
+        # change added - 30 - however far a feeder's own requirement moved.
+        self.assertEqual(required["var:HUB-0"].chars, 60)
         for index in range(50):
             self.assertIn(f"var:LEAF-{index}", required)
-            self.assertEqual(required[f"var:LEAF-{index}"].chars, 80)
+            self.assertEqual(required[f"var:LEAF-{index}"].chars, 60)
 
 
 class _RecordingDeque(collections.deque):

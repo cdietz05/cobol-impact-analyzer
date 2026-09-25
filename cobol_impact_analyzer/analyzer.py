@@ -653,6 +653,17 @@ class ImpactAnalyzer:
         self._growth: dict[tuple[str, ...], int] = {}
         self._contribution: dict[tuple[tuple[str, ...], str], int] = {}
         self._string_base: dict[tuple[str, ...], int] = {}
+        # Every rule that ADDS to a width - a sum over STRING sources or group
+        # members, an arithmetic result grown by its operand's delta - feeds on
+        # itself around a cycle and never converges: MOVE CUST-REC TO a member
+        # of CUST-REC grows the member to the record, which grows the record by
+        # the member, and so on until the relaxation budget runs out with a
+        # width thousands of digits long. Two guards keep every rule bounded.
+        # Sums inside a strongly connected component take the widest member
+        # instead of adding them up, and a delta never exceeds what the
+        # requested changes themselves added.
+        self._component = _strongly_connected_components(self.graph)
+        self._delta_cap = _seed_growth(self.spec.changes)
 
         for change in self.spec.changes:
             node_id = _column_id(change.table, change.column)
@@ -760,7 +771,13 @@ class ImpactAnalyzer:
             return self._string_requirement(edge, source, source_required, target)
         if edge.kind is EdgeKind.GROUP_PARENT:
             return self._group_requirement(edge, source, source_required, target)
-        return _required_at_target(edge, source.capacity, source_required, target.capacity)
+        return _required_at_target(
+            edge, source.capacity, source_required, target.capacity, self._delta_cap
+        )
+
+    def _in_cycle(self, edge: Edge) -> bool:
+        component = self._component.get(edge.source_id)
+        return component is not None and component == self._component.get(edge.target_id)
 
     def _accumulate(self, key: tuple[str, ...], member: str, amount: int) -> int:
         """Record what ``member`` adds to ``key`` and return the new total."""
@@ -782,6 +799,12 @@ class ImpactAnalyzer:
         key = ("string", edge.target_id, edge.ref.path, str(edge.ref.line))
         before = _sliced_width(source.capacity, edge.source_slice)
         after = _sliced_width(source_required, edge.source_slice)
+        if self._in_cycle(edge):
+            # The target feeds its own source: hold the widest piece, but do
+            # not add a total that grows every time round the loop.
+            if after <= target.capacity.chars:
+                return None
+            return target.capacity.grown_to_hold(Capacity(kind=Kind.ALPHANUMERIC, chars=after))
         growth = self._accumulate(key, edge.source_id, max(after - before, 0))
         if growth <= 0:
             return None
@@ -829,6 +852,17 @@ class ImpactAnalyzer:
             return None  # shares storage already counted; see copybook.finalize
         occurs = max(item.occurs, 1) if item is not None else 1
         added = _storage_growth(source, source_required) * occurs
+        if self._in_cycle(edge):
+            # The group flows back into this member (MOVE CUST-REC TO a field
+            # of CUST-REC). No size satisfies that: the member must hold the
+            # record, and the record contains the member. Any rule that adds
+            # to the group or multiplies by OCCURS here grows it every time
+            # round the loop, so inside a cycle the group only has to hold the
+            # widest member, and the loop settles.
+            needed = source_required.text_width
+            if needed <= target.capacity.chars:
+                return None
+            return Capacity(kind=Kind.GROUP, chars=needed)
         growth = self._accumulate(("group", edge.target_id), edge.source_id, added)
         if growth <= 0:
             return None
@@ -1320,6 +1354,58 @@ class ImpactAnalyzer:
         return f"var:{program.name}::{item.name}"
 
 
+def _strongly_connected_components(graph: ImpactGraph) -> dict[str, int]:
+    """Component id per node (iterative Tarjan), so cycles can be recognised.
+
+    Iterative because a real corpus has paths far deeper than Python's
+    recursion limit.
+    """
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    component: dict[str, int] = {}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    counter = 0
+    next_component = 0
+    for root in graph.nodes:
+        if root in index:
+            continue
+        work: list[tuple[str, int]] = [(root, 0)]
+        while work:
+            node_id, position = work.pop()
+            if position == 0:
+                index[node_id] = low[node_id] = counter
+                counter += 1
+                stack.append(node_id)
+                on_stack.add(node_id)
+            edges = graph.out_edges.get(node_id, [])
+            descended = False
+            while position < len(edges):
+                target = edges[position].target_id
+                position += 1
+                if target not in index:
+                    work.append((node_id, position))
+                    work.append((target, 0))
+                    descended = True
+                    break
+                if target in on_stack:
+                    low[node_id] = min(low[node_id], index[target])
+            if descended:
+                continue
+            if low[node_id] == index[node_id]:
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    component[member] = next_component
+                    if member == node_id:
+                        break
+                next_component += 1
+            if work:
+                parent = work[-1][0]
+                low[parent] = min(low[parent], low[node_id])
+    return component
+
+
 def _column_id(table: str, column: str) -> str:
     return f"col:{table.upper()}.{column.upper()}"
 
@@ -1347,6 +1433,7 @@ def _required_at_target(
     source_current: Capacity,
     source_required: Capacity,
     target_current: Capacity,
+    cap: Optional["_Growth"] = None,
 ) -> Optional[Capacity]:
     """Capacity the destination of ``edge`` needs, given a widened source."""
     if edge.kind is EdgeKind.REDEFINES:
@@ -1355,10 +1442,12 @@ def _required_at_target(
         # needs nothing. redefined-by: the base grew, so the record length grew
         # by that much; do not inflate this layout to the base's size.
         if edge.note == "redefined-by":
-            return _grow_by_delta(target_current, source_current, source_required)
+            return _grow_by_delta(
+                target_current, source_current, source_required, cap, overlay=True
+            )
         return target_current.grown_to_hold(source_required)
     if edge.kind in _COMBINING or edge.kind in _LAYOUT:
-        return _grow_by_delta(target_current, source_current, source_required)
+        return _grow_by_delta(target_current, source_current, source_required, cap)
     carried = source_required
     if edge.source_slice is not None:
         # MOVE CUST-NAME (1:20) moves 20 characters however wide CUST-NAME
@@ -1412,15 +1501,48 @@ def _storage_growth(node: Node, need: Capacity) -> int:
     return max(grown - item.storage_bytes, 0)
 
 
+@dataclass(frozen=True)
+class _Growth:
+    """The most any requested change widens a value by."""
+
+    int_digits: int
+    dec_digits: int
+    chars: int
+
+
+def _seed_growth(changes: Iterable[ColumnChange]) -> _Growth:
+    int_digits = dec_digits = chars = 0
+    for change in changes:
+        old, new = change.old_capacity, change.new_capacity
+        int_digits = max(int_digits, new.int_digits - old.int_digits)
+        dec_digits = max(dec_digits, new.dec_digits - old.dec_digits)
+        chars = max(chars, new.text_width - old.text_width)
+    return _Growth(int_digits, dec_digits, chars)
+
+
 def _grow_by_delta(
     target_current: Capacity,
     source_current: Capacity,
     source_required: Capacity,
+    cap: Optional[_Growth] = None,
+    overlay: bool = False,
 ) -> Optional[Capacity]:
-    """Grow the destination by exactly the amount the source grew."""
+    """Grow the destination by the amount the source grew.
+
+    ``cap`` bounds the delta by what the requested changes added. A source's
+    requirement can be far above its original for reasons that have nothing to
+    do with the change - a MOVE from a much wider field upstream - and passing
+    that on as a delta is what made cycles diverge.
+
+    ``overlay`` is a REDEFINES: the base only pushes the record past the
+    redefining item once it outgrows the larger of the two.
+    """
     if target_current.kind.is_numeric() and source_required.kind.is_numeric():
         int_delta = max(source_required.int_digits - source_current.int_digits, 0)
         dec_delta = max(source_required.dec_digits - source_current.dec_digits, 0)
+        if cap is not None:
+            int_delta = min(int_delta, cap.int_digits)
+            dec_delta = min(dec_delta, cap.dec_digits)
         if not int_delta and not dec_delta:
             return None
         return Capacity(
@@ -1430,7 +1552,14 @@ def _grow_by_delta(
             dec_digits=target_current.dec_digits + dec_delta,
             signed=target_current.signed,
         )
-    delta = max(source_required.text_width - source_current.text_width, 0)
+    baseline = source_current.text_width
+    if overlay:
+        baseline = max(baseline, target_current.text_width)
+    delta = max(source_required.text_width - baseline, 0)
+    if cap is not None and not overlay:
+        # Group and REDEFINES sizes are bytes and can legitimately add several
+        # changes together, so only value deltas are capped.
+        delta = min(delta, max(cap.chars, cap.int_digits + cap.dec_digits))
     if not delta:
         return None
     if target_current.kind is Kind.UNKNOWN:
