@@ -400,7 +400,7 @@ def _extract_exec_sql(
 
 def _finish_block(buffer: list[str], line_no: int, path: str) -> tuple[str, SourceRef]:
     text = " ".join(part.strip() for part in buffer if part.strip()).strip().rstrip(";")
-    ref = SourceRef(path=path, line=line_no, text=text[:200])
+    ref = SourceRef(path=path, line=line_no, text=text[:2000])
     return text, ref
 
 

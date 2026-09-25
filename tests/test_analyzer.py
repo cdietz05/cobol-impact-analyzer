@@ -1024,6 +1024,16 @@ class QualifiedReferenceTests(unittest.TestCase):
     def test_the_accumulator_fed_by_a_qualified_add_is_found(self):
         self.assertTrue(_find(self.result, "var:CUBCE100::WS-UNBILL-TOTAL"))
 
+    def test_the_html_trace_starts_at_the_sql_and_names_each_statement(self):
+        page = report.to_html(self.result)
+        flow = page[page.index("<h2>Flow</h2>") : page.index("<h2>Changes by module</h2>")]
+        # The whole FETCH, not a 200-character stub of it.
+        self.assertIn(":CU02TB04.KY-DB-SEQ-NO", flow)
+        self.assertIn("cursor CEP_DEBIT, declared at", flow)
+        self.assertIn("ADD AT-REMN-DB OF CU02TB04 TO WS-UNBILL-TOTAL", flow)
+        # Every finding carries its own hop-by-hop trace as well.
+        self.assertIn("class='trace'", page)
+
 
 class ReferenceModificationTests(unittest.TestCase):
     @classmethod

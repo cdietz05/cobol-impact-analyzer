@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25 18:48:53Z",
+  "generated_at": "2026-09-25 19:08:05Z",
   "spec": {
     "changes": [
       {
@@ -271,7 +271,7 @@
           "line": 26,
           "program": "CUSTUPD",
           "paragraph": "",
-          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-N"
+          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-NAME"
         },
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
@@ -305,7 +305,7 @@
           "line": 26,
           "program": "CUSTUPD",
           "paragraph": "",
-          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-N"
+          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-NAME"
         },
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
@@ -658,7 +658,7 @@
           "line": 26,
           "program": "CUSTUPD",
           "paragraph": "",
-          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-N"
+          "text": "SELECT CUST_ID, CUST_NAME, CUST_ADDR_1, CUST_CITY, CUST_STATE, CUST_BALANCE INTO :CUST-ID, :CUST-NAME, :CUST-ADDR-1, :CUST-CITY, :CUST-STATE, :CUST-BALANCE FROM CUSTOMER WHERE CUST_NAME = :WS-SEARCH-NAME"
         },
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/WSCOMMON.cpy",

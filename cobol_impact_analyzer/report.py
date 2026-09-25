@@ -711,6 +711,21 @@ details.sevkey dd ul { margin: 4px 0 0; padding-left: 16px; color: var(--muted);
                        font-size: 12.5px; }
 h3 .blurb { display: block; font-size: 12px; font-weight: 400; color: var(--muted);
             margin-top: 2px; }
+
+/* Trace: every hop, with the statement that made it */
+.hop { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+       text-transform: uppercase; color: var(--muted); border: 1px solid var(--line);
+       border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+code.stmt { display: block; margin: 3px 0 2px; padding: 4px 8px; background: var(--bg);
+            border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere;
+            color: var(--ink); }
+.fits { color: var(--muted); font-size: 12px; }
+ul.flow details > summary { cursor: pointer; }
+ul.flow details > summary::marker { color: var(--muted); }
+details.trace { margin-top: 6px; }
+details.trace > summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+ol.trace { margin: 6px 0 0; padding-left: 22px; font-size: 12.5px; }
+ol.trace li { margin: 5px 0; }
 """
 
 
@@ -722,6 +737,175 @@ def _badge(sev: str) -> str:
     except ValueError:
         colour = "#5b6470"
     return f"<span class='badge' style='background:{colour}'>{html.escape(sev)}</span>"
+
+
+_HOP_LABEL = {
+    "sql-fetch": "SQL into",
+    "sql-bind": "SQL write",
+    "sql-predicate": "SQL where",
+    "move": "MOVE",
+    "string": "STRING",
+    "unstring": "UNSTRING",
+    "compute": "COMPUTE",
+    "arithmetic": "arithmetic",
+    "call-arg": "CALL",
+    "write-from": "WRITE FROM",
+    "read-into": "READ INTO",
+    "compare": "compared",
+    "group-parent": "in record",
+    "redefines": "REDEFINES",
+    "shared-declaration": "same copybook line",
+    "initialize": "INITIALIZE",
+    "display": "DISPLAY",
+    "reference-modification": "ref-mod",
+}
+
+
+def _statement_text(edge) -> str:
+    text = re.sub(r"\s+", " ", edge.ref.text or "").strip()
+    return text if len(text) <= 1200 else text[:1200] + " ..."
+
+
+def _hop_html(edge) -> str:
+    """How a value got here: the kind of step, where, and the statement."""
+    if edge is None:
+        return ""
+    label = _HOP_LABEL.get(edge.kind.value, edge.kind.value)
+    parts = [f"<span class='hop'>{html.escape(label)}</span>"]
+    if edge.ref.path:
+        parts.append(f"<span class='loc'>{html.escape(edge.ref.location())}</span>")
+    if edge.kind.value.startswith("sql-"):
+        # Which column and which host variable this hop pairs, out of a
+        # statement that may list dozens of each.
+        column = _plain_name(edge.source_id if edge.kind.value != "sql-bind" else edge.target_id)
+        host = _plain_name(edge.target_id if edge.kind.value != "sql-bind" else edge.source_id)
+        pairing = f"{column} → :{host}" if edge.kind.value != "sql-bind" else f":{host} → {column}"
+        parts.append(f"<span class='mono'>{html.escape(pairing)}</span>")
+    if edge.note and edge.kind.value in ("call-arg", "sql-fetch", "sql-bind", "sql-predicate"):
+        parts.append(f"<span class='muted'>{html.escape(edge.note)}</span>")
+    statement = _statement_text(edge)
+    text = " ".join(parts)
+    if statement:
+        text += f"<code class='stmt'>{html.escape(statement)}</code>"
+    return text
+
+
+def _node_html(result: AnalysisResult, by_node: dict[str, Finding], node_id: str) -> str:
+    """One field in a trace: name, program, width change or 'fits', severity."""
+    name, module, change, sev, _ = _flow_line(result, by_node, node_id)
+    node = result.graph.nodes.get(node_id)
+    row = [f"<span class='fname mono'>{html.escape(name)}</span>"]
+    if node is not None and node.kind.value == "declaration":
+        row.append("<span class='fmod'>copybook declaration, shared by every program that includes it</span>")
+    elif module:
+        row.append(f"<span class='fmod'>{html.escape(module)}</span>")
+    if change:
+        row.append(f"<span class='fwid'>{html.escape(change)}</span>")
+    elif node is not None and node.kind.value != "declaration" and node_id in result.required:
+        row.append("<span class='fits'>already wide enough</span>")
+    if sev:
+        row.append(_badge(sev))
+    return " &nbsp; ".join(row)
+
+
+def _trace_steps(result: AnalysisResult, path: list[str]):
+    """(node, the edge that reached it) for each hop of a route."""
+    steps = []
+    for index, node_id in enumerate(path):
+        edge = None
+        if index:
+            previous = path[index - 1]
+            edge = result.hops.get(node_id)
+            if edge is None or edge.source_id != previous:
+                edge = next(
+                    (e for e in result.graph.successors(previous) if e.target_id == node_id),
+                    None,
+                )
+        steps.append((node_id, edge))
+    return steps
+
+
+def _finding_trace_html(result: AnalysisResult, by_node: dict[str, Finding], finding: Finding) -> str:
+    """The route from the changed column to this field, one statement a hop."""
+    path = finding.path or result.paths.get(finding.node_id, [])
+    if len(path) < 2:
+        return ""
+    items = []
+    for node_id, edge in _trace_steps(result, path):
+        line = _node_html(result, by_node, node_id)
+        if edge is None:
+            line += " &nbsp; <span class='muted'>the column being changed</span>"
+        else:
+            line += "<br>" + _hop_html(edge)
+        items.append(f"<li>{line}</li>")
+    return (
+        f"<details class='trace'><summary>Trace &middot; {len(path) - 1} step(s) from "
+        f"{html.escape(_plain_name(path[0]))}</summary><ol class='trace'>"
+        + "".join(items)
+        + "</ol></details>"
+    )
+
+
+def _trace_tree_html(result: AnalysisResult) -> str:
+    """Everywhere each changed column goes, from the SQL that reads it.
+
+    Built from every node the change reached, not only the findings, so a
+    field that is already wide enough still shows - with the statement that
+    carried the value there - and the route past it stays visible.
+    """
+    children: dict[str, list[str]] = {}
+    for node_id, parent in result.parents.items():
+        children.setdefault(parent, []).append(node_id)
+    by_node = {finding.node_id: finding for finding in result.findings}
+
+    def order(node_id: str):
+        finding = by_node.get(node_id)
+        rank = finding.severity.rank if finding is not None else 9
+        return (rank, _plain_name(node_id), node_id)
+
+    def render(node_id: str, seen: frozenset) -> str:
+        line = _node_html(result, by_node, node_id)
+        hop = _hop_html(result.hops.get(node_id))
+        body = line + ("<br>" + hop if hop else "")
+        finding = by_node.get(node_id)
+        if finding is not None and finding.notes:
+            body += "<ul class='notes'>" + "".join(
+                f"<li>{html.escape(note)}</li>" for note in finding.notes
+            ) + "</ul>"
+        kids = [kid for kid in sorted(children.get(node_id, []), key=order) if kid not in seen]
+        if not kids:
+            return f"<li>{body}</li>"
+        inner = "".join(render(kid, seen | {kid}) for kid in kids)
+        node = result.graph.nodes.get(node_id)
+        # A copybook declaration fans out to every includer; keep it folded.
+        opened = "" if node is not None and node.kind.value == "declaration" else " open"
+        return (
+            f"<li><details{opened}><summary>{body} "
+            f"<span class='muted'>({len(kids)} onward)</span></summary>"
+            f"<ul class='flow'>{inner}</ul></details></li>"
+        )
+
+    parts = []
+    for change in result.spec.changes:
+        root_id = f"col:{change.table.upper()}.{change.column.upper()}"
+        head = (
+            f"{html.escape(change.key)} &nbsp; <span class='fwid'>"
+            f"{html.escape(change.old_type)} &rarr; {html.escape(change.new_type)}</span>"
+        )
+        kids = sorted(children.get(root_id, []), key=order)
+        if not kids:
+            parts.append(
+                f"<div class='panel flowpanel'><div class='flowroot mono'>{head}</div>"
+                "<p class='muted' style='margin:0'>No scanned statement reads or writes "
+                "this column.</p></div>"
+            )
+            continue
+        inner = "".join(render(kid, frozenset({root_id, kid})) for kid in kids)
+        parts.append(
+            f"<div class='panel flowpanel'><div class='flowroot mono'>{head}</div>"
+            f"<ul class='flow'>{inner}</ul></div>"
+        )
+    return "".join(parts) or "<div class='panel'>No COBOL field is reached by this change.</div>"
 
 
 def _flow_html(result: AnalysisResult) -> str:
@@ -881,11 +1065,15 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
     # 2. the trace
     parts.append("<h2>Flow</h2>")
     parts.append(
-        "<p class='legend'>Where the value moves. A badge marks a field that "
+        "<p class='legend'>Everywhere the value goes, starting from the SQL "
+        "statement that reads or writes the column. Each field shows the "
+        "statement that carried the value there. A badge marks a field that "
         "cannot hold the widened value; COBOL truncates it silently — characters "
-        "on the right, digits on the left, no runtime error.</p>"
+        "on the right, digits on the left, no runtime error. Fields marked "
+        "<em>already wide enough</em> need no change but are shown so the route "
+        "past them stays visible.</p>"
     )
-    parts.append(_flow_html(result))
+    parts.append(_trace_tree_html(result))
 
     # 3. the per-module edits
     parts.append("<h2>Changes by module</h2>")
@@ -911,6 +1099,7 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
             continue
         parts.append("<div class='scroll'><table>")
         parts.append("<tr><th>Field</th><th>Now &rarr; needs</th><th>Where</th></tr>")
+        by_node = {item.node_id: item for item in result.findings}
         for finding in bucket:
             where = "<br>".join(
                 f"<span class='loc mono'>{html.escape(ref.location())}</span>"
@@ -924,7 +1113,8 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
             parts.append(
                 "<tr>"
                 f"<td><strong>{html.escape(_plain_name(finding.node_id))}</strong> "
-                f"<span class='muted'>{html.escape(finding.category)}</span>{notes}</td>"
+                f"<span class='muted'>{html.escape(finding.category)}</span>{notes}"
+                f"{_finding_trace_html(result, by_node, finding)}</td>"
                 f"<td class='mono'>{html.escape(finding.current)} &rarr; "
                 f"{html.escape(finding.required)}</td>"
                 f"<td>{where}</td>"

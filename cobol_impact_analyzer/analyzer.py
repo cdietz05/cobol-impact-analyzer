@@ -202,6 +202,11 @@ class AnalysisResult:
     ddl: list[str]
     # Per-program verdicts, affected programs only, worst first.
     program_impacts: list[ProgramImpact] = field(default_factory=list)
+    # For EVERY node the change reached - not only the ones that became
+    # findings - the node it was reached from and the statement that carried
+    # it there. The full trace in the HTML report is built from these.
+    parents: dict[str, str] = field(default_factory=dict)
+    hops: dict[str, Edge] = field(default_factory=dict)
 
     @property
     def counts(self) -> dict[str, int]:
@@ -234,6 +239,7 @@ class ImpactAnalyzer:
         # because another program needs it wider is not in here - see
         # _propagate.
         self._flow_reached: set[str] = set()
+        self._parents: dict[str, str] = {}
         # Pass-through edge (source, target, path, line) -> (callee node prefix,
         # LINKAGE item the value enters, LINKAGE item it leaves by).
         self._pass_through: dict[tuple[str, str, str, int], tuple[str, str, str]] = {}
@@ -275,6 +281,8 @@ class ImpactAnalyzer:
             warnings=self.warnings,
             ddl=ddl,
             program_impacts=impacts,
+            parents=self._parents,
+            hops=edges_used,
         )
 
     # -- stage 1: parse ---------------------------------------------------
@@ -416,7 +424,8 @@ class ImpactAnalyzer:
                     path=statement.ref.path,
                     line=statement.ref.line,
                     program=program.name,
-                    text=statement.text[:200],
+                    # Whole statement: the trace in the HTML report shows it.
+                    text=statement.text[:2000],
                 )
                 if binding.direction is Direction.OUT:
                     self.graph.add_edge(
@@ -887,6 +896,7 @@ class ImpactAnalyzer:
 
         self.progress.step(processed, processed, f"{len(required)} node(s) affected")
         self._depth = depth
+        self._parents = parents
         # Widened data actually reaches these: what arrives through this
         # program's own statements does not fit the field as declared.
         self._flow_reached = {

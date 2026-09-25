@@ -596,11 +596,18 @@ class SqlAnalyzer:
             if expression == "*":
                 statement.unresolved.append("cursor selects *; column mapping needs table DDL")
                 continue
-            statement.bindings.extend(
-                _select_item_bindings(
-                    expression, host, indicator, declaration.aliases, default_table
-                )
+            fetched = _select_item_bindings(
+                expression, host, indicator, declaration.aliases, default_table
             )
+            # Name the cursor and where it is declared, so the trace can show
+            # the DECLARE behind a FETCH, not only the FETCH.
+            where = declaration.ref.location() if declaration.ref.path else "an unknown place"
+            for binding in fetched:
+                binding.note = (
+                    f"column {position + 1} of cursor {cursor}, declared at {where}"
+                    + (f"; {binding.note}" if binding.note else "")
+                )
+            statement.bindings.extend(fetched)
         return statement
 
     def _parse_open(self, text: str, ref: SourceRef) -> SqlStatement:
