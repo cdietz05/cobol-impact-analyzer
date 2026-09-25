@@ -825,11 +825,37 @@ def _trace_steps(result: AnalysisResult, path: list[str]):
     return steps
 
 
+def _findings_by_node(result: AnalysisResult) -> dict[str, Finding]:
+    """Finding for each node - including every program's copy of a copybook
+    field whose rows were merged into one."""
+    by_node: dict[str, Finding] = {}
+    for finding in result.findings:
+        by_node.setdefault(finding.node_id, finding)
+        for route in finding.other_paths:
+            if route:
+                by_node.setdefault(route[-1], finding)
+    return by_node
+
+
 def _finding_trace_html(result: AnalysisResult, by_node: dict[str, Finding], finding: Finding) -> str:
-    """The route from the changed column to this field, one statement a hop."""
-    path = finding.path or result.paths.get(finding.node_id, [])
+    """Every route from a changed column to this field, one statement a hop.
+
+    A copybook field is one row for all the programs that include it, so it
+    carries one route per program; each gets its own trace.
+    """
+    routes = [finding.path or result.paths.get(finding.node_id, [])] + finding.other_paths
+    return "".join(_route_html(result, by_node, route, len(routes) > 1) for route in routes)
+
+
+def _route_html(
+    result: AnalysisResult, by_node: dict[str, Finding], path: list[str], name_program: bool
+) -> str:
     if len(path) < 2:
         return ""
+    where = ""
+    if name_program:
+        module = _module_of(path[-1], result.graph.nodes.get(path[-1]), None)
+        where = f" in {html.escape(module)}" if module else ""
     items = []
     for node_id, edge in _trace_steps(result, path):
         line = _node_html(result, by_node, node_id)
@@ -839,7 +865,7 @@ def _finding_trace_html(result: AnalysisResult, by_node: dict[str, Finding], fin
             line += "<br>" + _hop_html(edge)
         items.append(f"<li>{line}</li>")
     return (
-        f"<details class='trace'><summary>Trace &middot; {len(path) - 1} step(s) from "
+        f"<details class='trace'><summary>Trace{where} &middot; {len(path) - 1} step(s) from "
         f"{html.escape(_plain_name(path[0]))}</summary><ol class='trace'>"
         + "".join(items)
         + "</ol></details>"
@@ -856,7 +882,7 @@ def _trace_tree_html(result: AnalysisResult) -> str:
     children: dict[str, list[str]] = {}
     for node_id, parent in result.parents.items():
         children.setdefault(parent, []).append(node_id)
-    by_node = {finding.node_id: finding for finding in result.findings}
+    by_node = _findings_by_node(result)
 
     def order(node_id: str):
         finding = by_node.get(node_id)
@@ -1099,12 +1125,15 @@ def to_html(result: AnalysisResult, title: str = "COBOL Column Widening Impact")
             continue
         parts.append("<div class='scroll'><table>")
         parts.append("<tr><th>Field</th><th>Now &rarr; needs</th><th>Where</th></tr>")
-        by_node = {item.node_id: item for item in result.findings}
+        by_node = _findings_by_node(result)
         for finding in bucket:
+            shown = finding.refs[:8]
             where = "<br>".join(
                 f"<span class='loc mono'>{html.escape(ref.location())}</span>"
-                for ref in finding.refs[:2]
+                for ref in shown
             )
+            if len(finding.refs) > len(shown):
+                where += f"<br><span class='muted'>and {len(finding.refs) - len(shown)} more</span>"
             notes = ""
             if finding.notes:
                 notes = "<ul class='notes'>" + "".join(

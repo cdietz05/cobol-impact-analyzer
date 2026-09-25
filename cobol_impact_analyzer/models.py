@@ -450,6 +450,10 @@ class Finding:
     # Squashing them into one string made a single cell hundreds of characters
     # wide and pushed everything after it off the page.
     notes: list[str] = field(default_factory=list)
+    # A copybook field is one row however many programs include it; the
+    # routes by which the change reached it in the OTHER programs are kept
+    # here, so each program's trace can still be shown.
+    other_paths: list[list[str]] = field(default_factory=list)
 
     def sort_key(self) -> tuple[int, int, str]:
         return (self.severity.rank, self.distance, self.node_id)
@@ -467,5 +471,6 @@ class Finding:
             "remediation": self.remediation,
             "hops_from_change": self.distance,
             "propagation_path": self.path,
+            "other_propagation_paths": self.other_paths,
             "references": [ref.to_dict() for ref in self.refs],
         }

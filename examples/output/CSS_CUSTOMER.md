@@ -1,13 +1,13 @@
 # CSS_CUSTOMER widening — changes by file
 
-_Generated 2026-09-25 19:34:42Z._
+_Generated 2026-09-25 19:56:25Z._
 
 ## Requested change
 
 - `CSS_CUSTOMER.CUST_NAME` &nbsp; `VARCHAR2(30)` → `VARCHAR2(40)`
 - `CSS_CUSTOMER.CUST_BALANCE` &nbsp; `NUMBER(11,2)` → `NUMBER(13,2)`
 
-Findings: CRITICAL 23, HIGH 11, MEDIUM 12, LOW 11, INFO 2.
+Findings: CRITICAL 16, HIGH 9, MEDIUM 5, INFO 2.
 
 ## Files to edit
 
@@ -19,8 +19,12 @@ Findings: CRITICAL 23, HIGH 11, MEDIUM 12, LOW 11, INFO 2.
 ### `examples/css/copybooks/CSCUST.cpy`
 
 - **CS-CUST-BALANCE** (line 14, CRITICAL): `05 CS-CUST-BALANCE PIC S9(9)V99 COMP-3` → `05 CS-CUST-BALANCE PIC S9(11)V9(2) COMP-3.`
+  - copybook: CSCUST.cpy line 14 is included by 6 program(s) - CSACCTUPD, CSBILLCYC, CSCUSTINQ, CSCUSTRPT, CSPURGE, CSSVCORD. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-CUST-NAME** (line 7, CRITICAL): `05 CS-CUST-NAME PIC X(30) DISPLAY` → `05 CS-CUST-NAME PIC X(40).`
+  - reference-modification: the offset/length is hard-coded and will not follow the new width.
+  - copybook: CSCUST.cpy line 7 is included by 6 program(s) - CSACCTUPD, CSBILLCYC, CSCUSTINQ, CSCUSTRPT, CSPURGE, CSSVCORD. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-CUSTOMER-REC** — MEDIUM — CS-CUSTOMER-REC: record length grows 146 -> 157 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
+  - copybook: CSCUST.cpy line 5 is included by 6 program(s) - CSACCTUPD, CSBILLCYC, CSCUSTINQ, CSCUSTRPT, CSPURGE, CSSVCORD. One edit to the copybook covers all of them; each is rebuilt.
 
 ### `examples/css/copybooks/CSSVC.cpy`
 
@@ -31,14 +35,20 @@ Findings: CRITICAL 23, HIGH 11, MEDIUM 12, LOW 11, INFO 2.
 ### `examples/css/copybooks/CSWORK.cpy`
 
 - **CS-RL-BALANCE** (line 11, CRITICAL): `05 CS-RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY` → `05 CS-RL-BALANCE PIC Z,ZZZ,ZZZ,ZZZ,ZZ9.99-.`
+  - copybook: CSWORK.cpy line 11 is included by 3 program(s) - CSBILLCYC, CSCUSTINQ, CSCUSTRPT. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-RL-NAME** (line 7, CRITICAL): `05 CS-RL-NAME PIC X(30) DISPLAY` → `05 CS-RL-NAME PIC X(40).`
+  - copybook: CSWORK.cpy line 7 is included by 3 program(s) - CSBILLCYC, CSCUSTINQ, CSCUSTRPT. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-CUST-KEY** (line 18, HIGH): `01 CS-CUST-KEY PIC X(40) DISPLAY` → `01 CS-CUST-KEY PIC X(81).`
+  - copybook: CSWORK.cpy line 18 is included by 3 program(s) - CSBILLCYC, CSCUSTINQ, CSCUSTRPT. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-RL-FLAT** (line 15, HIGH): `01 CS-RL-FLAT PIC X(83) DISPLAY` → `01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(100).`
   - overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 100 - check it)
   - display: report or log column alignment shifts.
+  - copybook: CSWORK.cpy line 15 is included by 3 program(s) - CSBILLCYC, CSCUSTINQ, CSCUSTRPT. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-SEARCH-NAME** (line 17, HIGH): `01 CS-SEARCH-NAME PIC X(30) DISPLAY` → `01 CS-SEARCH-NAME PIC X(40).`
+  - copybook: CSWORK.cpy line 17 is included by 3 program(s) - CSBILLCYC, CSCUSTINQ, CSCUSTRPT. One edit to the copybook covers all of them; each is rebuilt.
 - **CS-REPORT-LINE** — MEDIUM — CS-REPORT-LINE: record length grows 83 -> 100 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
   - overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 100 - check it)
+  - copybook: CSWORK.cpy line 4 is included by 3 program(s) - CSBILLCYC, CSCUSTINQ, CSCUSTRPT. One edit to the copybook covers all of them; each is rebuilt.
 
 ### `examples/css/copybooks/CSXTRACT.cpy`
 

@@ -1209,9 +1209,78 @@ class ImpactAnalyzer:
                 findings.append(self._variable_finding(node, need, distance, path, edge))
 
         self._attach_usage_notes(findings, impacted)
+        findings = self._one_row_per_copybook_line(findings)
         findings.extend(self._unreferenced_findings(seeds))
         findings.sort(key=Finding.sort_key)
         return findings
+
+    def _copybook_declaration(self, node_id: str) -> Optional[tuple]:
+        """The copybook line a node's field is declared on, or None if inline."""
+        entries = self._node_fields.get(node_id)
+        if not entries:
+            return None
+        program, item = entries[0]
+        if item.source is None or Path(item.source.path) == Path(program.path):
+            return None
+        return (
+            item.source.path,
+            item.source.line,
+            item.level,
+            item.picture,
+            item.usage,
+            item.occurs,
+        )
+
+    def _one_row_per_copybook_line(self, findings: list[Finding]) -> list[Finding]:
+        """One copybook field is one row, however many programs include it.
+
+        Every includer gets its own node for a copybook field, so one field
+        came back once per program - at every severity: CUST-NAME CRITICAL in
+        each program that fetches it, a LOW "widens with CUSTOMER.cpy" row for
+        each that does not, the same "record length grows" row for every
+        includer. It is one edit to one line. All findings for a copybook line
+        are merged into the worst of them; the others' locations, notes and
+        routes are kept on it, so every program's statement and trace still
+        show.
+        """
+        groups: dict[tuple, list[Finding]] = {}
+        for finding in findings:
+            key = self._copybook_declaration(finding.node_id)
+            if key is not None:
+                groups.setdefault(key, []).append(finding)
+
+        dropped: set[int] = set()
+        for key, members in groups.items():
+            if len(members) < 2:
+                continue
+            keep = min(members, key=Finding.sort_key)
+            programs = sorted(
+                {
+                    name
+                    for member in members
+                    for name in self.graph.nodes[member.node_id].programs
+                }
+            )
+            seen_refs = {(ref.path, ref.line) for ref in keep.refs}
+            for member in sorted(members, key=Finding.sort_key):
+                if member is keep:
+                    continue
+                dropped.add(id(member))
+                for note in member.notes:
+                    if note not in keep.notes:
+                        keep.notes.append(note)
+                for ref in member.refs:
+                    if (ref.path, ref.line) not in seen_refs:
+                        seen_refs.add((ref.path, ref.line))
+                        keep.refs.append(ref)
+                if member.path and member.path != keep.path and member.path not in keep.other_paths:
+                    keep.other_paths.append(member.path)
+            keep.notes.append(
+                f"copybook: {Path(key[0]).name} line {key[1]} is included by "
+                f"{len(programs)} program(s) - {', '.join(programs)}. One edit to "
+                "the copybook covers all of them; each is rebuilt."
+            )
+        return [finding for finding in findings if id(finding) not in dropped]
 
     def _seed_finding(
         self, node_id: str, node: Node, distance: int, path: list[str]

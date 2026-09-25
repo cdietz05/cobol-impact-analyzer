@@ -10,7 +10,7 @@ Change: `CSS_CUSTOMER.CUST_NAME` `VARCHAR2(30) → VARCHAR2(40)` and
 `CSS_CUSTOMER.CUST_BALANCE` `NUMBER(11,2) → NUMBER(13,2)`.
 
 Result: 8 programs scanned, 8 affected, 3 recompile-only, 0 coverage warnings,
-219 graph nodes / 455 edges. Findings: CRITICAL 23, HIGH 11, MEDIUM 12, LOW 11, INFO 2.
+219 graph nodes / 455 edges. Findings: CRITICAL 16, HIGH 9, MEDIUM 5, INFO 2 - one row per field per file.
 
 ## What each chain proves
 
@@ -31,7 +31,7 @@ Result: 8 programs scanned, 8 affected, 3 recompile-only, 0 coverage warnings,
 | `CALL` output argument back to the caller | `LK-DISPLAY-KEY → CS-CUST-KEY`, `LK-TECH-NOTES → CS-SVC-TECH-NOTES` | HIGH in the caller | yes |
 | Host variable in a `WHERE` predicate | `CSCUSTINQ` `CS-SEARCH-NAME` | HIGH (not CRITICAL — a predicate does not truncate) | yes |
 | Recompile-only classification | `CSACCTUPD`, `CSPURGE`, `CSSVCORD` | in the rebuild list, nothing to edit in their own source | yes |
-| Copybook field widened by another program | `CS-CUST-NAME` in `CSCUSTRPT`, `CSPURGE` | LOW `copybook-field` — the copybook is edited for other programs; rebuild only | yes |
+| One row per copybook line | `CS-CUST-NAME` in `CSCUSTRPT`, `CSPURGE`; `CS-CUSTOMER-REC` | no extra row for a copybook line another finding already changes; one record-length row per copybook record, naming all six includers | yes |
 | Statement assuming the old width | `CSCUSTRPT` `DISPLAY CS-RL-FLAT` | the print line it displays grows `83 -> 100`, so `CSCUSTRPT` is a source change, not recompile-only | yes |
 | Both `CALL`ees are in the scan | — | no "unresolved CALL" warning | yes (0 warnings) |
 

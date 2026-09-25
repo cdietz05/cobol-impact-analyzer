@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25 19:34:42Z",
+  "generated_at": "2026-09-25 19:56:25Z",
   "spec": {
     "changes": [
       {
@@ -83,6 +83,7 @@
         "col:CUTBLA.CB_NAME",
         "var:WVLOAD::WV-CUST-NAME"
       ],
+      "other_propagation_paths": [],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
@@ -115,6 +116,7 @@
         "col:CUTBLA.CB_VALUE",
         "var:WVLOAD::WV-VALUE"
       ],
+      "other_propagation_paths": [],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
@@ -148,6 +150,7 @@
         "var:WVLOAD::WV-VALUE",
         "var:WVLOAD::WV-CUTBLA-KEY"
       ],
+      "other_propagation_paths": [],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
@@ -184,6 +187,7 @@
         "var:WVLOAD::WV-CUTBLA-KEY",
         "var:WVLOAD::WV-CUTBLA-VIEW"
       ],
+      "other_propagation_paths": [],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
@@ -215,6 +219,7 @@
       "propagation_path": [
         "col:CUTBLA.CB_NAME"
       ],
+      "other_propagation_paths": [],
       "references": []
     },
     {
@@ -231,6 +236,7 @@
       "propagation_path": [
         "col:CUTBLA.CB_VALUE"
       ],
+      "other_propagation_paths": [],
       "references": []
     }
   ],

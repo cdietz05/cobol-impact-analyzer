@@ -30,13 +30,31 @@ def _find(result, node_id):
     return [finding for finding in result.findings if finding.node_id == node_id]
 
 
+def _field(result, name):
+    """Every finding for field ``name``, whichever program's node carries it."""
+    return [f for f in result.findings if f.node_id.endswith(f"::{name}")]
+
+
+def _rows(result, name, category):
+    """Findings for field ``name`` in any program, of one category.
+
+    A copybook record is one row however many programs include it, so tests
+    ask for it by name rather than by which program's node carries the row.
+    """
+    return [
+        finding
+        for finding in result.findings
+        if finding.category == category and finding.node_id.endswith(f"::{name}")
+    ]
+
+
 class PropagationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.result = _run_name_widening()
 
     def test_the_direct_host_variable_is_critical(self):
-        findings = _find(self.result, "var:CUSTUPD::CUST-NAME")
+        findings = _field(self.result, "CUST-NAME")
         self.assertTrue(findings)
         self.assertIs(findings[0].severity, Severity.CRITICAL)
         self.assertIn("X(60)", findings[0].remediation)
@@ -76,11 +94,7 @@ class PropagationTests(unittest.TestCase):
         )
 
     def test_group_record_length_change_is_reported(self):
-        findings = [
-            finding
-            for finding in _find(self.result, "var:CUSTUPD::CUSTOMER-REC")
-            if finding.category == "record-layout"
-        ]
+        findings = _rows(self.result, "CUSTOMER-REC", "record-layout")
         self.assertTrue(findings)
         self.assertIn("bytes", findings[0].required)
 
@@ -88,7 +102,7 @@ class PropagationTests(unittest.TestCase):
         # A REFMOD used to be its own finding. It is a note on the field's own
         # finding now, so one field is one row however many ways it is used -
         # see _attach_usage_notes.
-        findings = _find(self.result, "var:CUSTUPD::CUST-NAME")
+        findings = _field(self.result, "CUST-NAME")
         self.assertTrue(findings)
         self.assertTrue(
             any(note.startswith("reference-modification") for note in findings[0].notes),
@@ -100,6 +114,19 @@ class PropagationTests(unittest.TestCase):
         # characters wide and pushed the Where column off the HTML report.
         for finding in self.result.findings:
             self.assertNotIn("Also:", finding.detail)
+
+    def test_every_edit_is_listed_once(self):
+        # One field in one file is one edit, whichever programs reach it. A
+        # copybook field used to come back once per including program.
+        for spec in ("change_spec.json", "css/change_spec.json", "redefines/change_spec.json"):
+            result = analyze(load_spec(EXAMPLES / spec))
+            edits = []
+            for finding in result.findings:
+                node = result.graph.nodes.get(finding.node_id)
+                where = node.declared_in.path if node is not None and node.declared_in else ""
+                edits.append((where, node.name if node is not None else finding.node_id))
+            repeated = {edit for edit in edits if edits.count(edit) > 1}
+            self.assertFalse(repeated, spec)
 
     def test_a_field_is_reported_once_per_program_however_often_it_is_used(self):
         for node_id in {finding.node_id for finding in self.result.findings}:
@@ -123,7 +150,7 @@ class NumericPropagationTests(unittest.TestCase):
         result = analyze(
             _spec(build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"))
         )
-        findings = _find(result, "var:CUSTUPD::CUST-BALANCE")
+        findings = _field(result, "CUST-BALANCE")
         self.assertTrue(findings)
         self.assertIn("9(11)", findings[0].remediation)
 
@@ -155,7 +182,7 @@ class NameSpellingTests(unittest.TestCase):
         result = _run_name_widening()
         # CUSTOMER.CUST_NAME (underscore) reaches CUST-NAME (hyphen) because the
         # binding comes from the SELECT INTO, never from matching the spellings.
-        findings = _find(result, "var:CUSTUPD::CUST-NAME")
+        findings = _field(result, "CUST-NAME")
         self.assertTrue(findings)
         self.assertEqual(findings[0].path[0], "col:CUSTOMER.CUST_NAME")
 
@@ -555,13 +582,17 @@ class VariableScopeTests(unittest.TestCase):
     def setUpClass(cls):
         cls.result = _run_name_widening()
 
-    def test_the_same_copybook_field_is_a_separate_node_in_each_program(self):
-        node_ids = {finding.node_id for finding in self.result.findings}
-        self.assertIn("var:CUSTUPD::CUST-NAME", node_ids)
-        self.assertIn("var:ORDENTRY::CUST-NAME", node_ids)
-        # The old global id linked every program's copy into one node, which is
-        # what invented flows between programs that never call each other.
-        self.assertNotIn("var:CUST-NAME", node_ids)
+    def test_a_copybook_field_is_one_row_that_keeps_each_programs_route(self):
+        # Each program still traces its own copy - the old global id linked
+        # every copy into one node and invented flows between programs that
+        # never call each other - but the copybook line is one edit, so it is
+        # one row, carrying every program's route.
+        [finding] = _field(self.result, "CUST-NAME")
+        routes = [finding.path] + finding.other_paths
+        reached = {route[1] for route in routes if len(route) > 1}
+        self.assertIn("var:CUSTUPD::CUST-NAME", reached)
+        self.assertIn("var:ORDENTRY::CUST-NAME", reached)
+        self.assertNotIn("var:CUST-NAME", {f.node_id for f in self.result.findings})
 
     def test_a_route_never_crosses_into_another_program_without_a_call(self):
         for finding in self.result.findings:
@@ -599,22 +630,25 @@ class RecordLengthTests(unittest.TestCase):
     def test_a_record_counts_every_member_that_grows(self):
         # 114 bytes, plus 30 for CUST-NAME, plus 1 for CUST-BALANCE. Keeping
         # only the larger increase reported 144.
-        [finding] = _layout(self.result, "var:CUSTUPD::CUSTOMER-REC")
+        [finding] = _rows(self.result, "CUSTOMER-REC", "record-layout")
         self.assertEqual(finding.required, "145 bytes")
 
-    def test_one_copybook_has_one_record_length_in_every_program(self):
+    def test_one_copybook_record_is_one_row_naming_every_includer(self):
         # CUSTTBL only fetches the balance and CUSTLIST only the name, but they
-        # compile against the same edited CUSTOMER.cpy.
+        # compile against the same edited CUSTOMER.cpy - one record length,
+        # one row, every includer named on it.
+        [finding] = _rows(self.result, "CUSTOMER-REC", "record-layout")
+        self.assertEqual(finding.required, "145 bytes")
+        [note] = [n for n in finding.notes if n.startswith("copybook:")]
         for program in ("CUSTARCH", "CUSTLIST", "CUSTPURG", "CUSTTBL", "CUSTUPD", "ORDENTRY"):
-            [finding] = _layout(self.result, f"var:{program}::CUSTOMER-REC")
-            self.assertEqual(finding.required, "145 bytes", program)
+            self.assertIn(program, note)
 
     def test_a_packed_field_grows_its_record_in_bytes_not_digits(self):
         result = analyze(
             _spec(build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"))
         )
         # S9(9)V99 COMP-3 is 6 bytes, S9(11)V99 COMP-3 is 7.
-        [finding] = _layout(result, "var:CUSTTBL::CUSTOMER-REC")
+        [finding] = _rows(result, "CUSTOMER-REC", "record-layout")
         self.assertEqual(finding.required, "115 bytes")
 
     def test_a_table_grows_by_every_entry(self):
@@ -641,15 +675,19 @@ class CopybookFieldTests(unittest.TestCase):
     def setUpClass(cls):
         cls.result = _run_name_widening()
 
-    def test_it_is_reported_as_a_rebuild(self):
-        [finding] = _find(self.result, "var:CUSTPURG::CUST-NAME")
-        self.assertEqual(finding.category, "copybook-field")
-        self.assertIs(finding.severity, Severity.LOW)
-        self.assertIn("X(60)", finding.remediation)
+    def test_a_line_already_being_changed_gets_no_extra_low_rows(self):
+        # CUST-NAME's copybook line already has findings asking for X(60).
+        # Repeating it as a LOW row for every other includer was noise.
+        self.assertFalse(_rows(self.result, "CUST-NAME", "copybook-field"))
 
-    def test_the_route_goes_through_the_copybook(self):
-        [finding] = _find(self.result, "var:CUSTPURG::CUST-NAME")
-        self.assertTrue(any(node.startswith("decl:") for node in finding.path), finding.path)
+    def test_no_copybook_line_is_listed_twice_in_the_low_rows(self):
+        lines = [
+            (ref.path, ref.line)
+            for finding in self.result.findings
+            if finding.category == "copybook-field"
+            for ref in finding.refs[:1]
+        ]
+        self.assertEqual(len(lines), len(set(lines)), lines)
 
     def test_the_program_is_still_recompile_only(self):
         [impact] = [i for i in self.result.program_impacts if i.program == "CUSTPURG"]
@@ -665,7 +703,7 @@ class CopybookFieldTests(unittest.TestCase):
         self.assertIs(finding.severity, Severity.CRITICAL)
 
     def test_a_field_widened_by_fetching_it_is_still_critical(self):
-        [finding] = _find(self.result, "var:CUSTLIST::CUST-NAME")
+        [finding] = _field(self.result, "CUST-NAME")
         self.assertEqual(finding.category, "host-variable")
         self.assertIs(finding.severity, Severity.CRITICAL)
 
@@ -751,9 +789,10 @@ class CopybookSizeDoesNotFlowTests(unittest.TestCase):
     def test_the_copybook_size_does_not_travel_through_another_programs_move(self):
         self.assertFalse(_find(self.result, "var:BYSTAND::WS-CITY-OUT"))
 
-    def test_the_other_programs_copy_is_a_rebuild(self):
-        [finding] = _find(self.result, "var:BYSTAND::CUST-CITY")
-        self.assertEqual(finding.category, "copybook-field")
+    def test_the_other_programs_copy_adds_no_row_of_its_own(self):
+        # WIDENER's finding already asks for the copybook edit; BYSTAND only
+        # recompiles against it.
+        self.assertFalse(_find(self.result, "var:BYSTAND::CUST-CITY"))
 
 
 def _analyze_sources(sources: dict[str, str], copybooks: dict[str, str], *changes):
