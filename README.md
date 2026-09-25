@@ -291,7 +291,9 @@ target with room to spare needs nothing, and two widened sources add up. A
 sized for the other operands. A group grows by the bytes each member adds,
 times its `OCCURS` — which is why a `COMP-3` field widening by two digits grows
 its record by one byte, not two, and a 100-entry table of them by 100. A
-`REDEFINES` is an overlay: the item it overlays only has to be big enough for
+comparison moves no data: a host variable in a SQL `WHERE`, or an `IF` operand,
+compared with a widened value is flagged as a `comparison`, but nothing flows
+on from it. A `REDEFINES` is an overlay: the item it overlays only has to be big enough for
 the grown layout, so a buffer that already reserves the room needs nothing.
 
 A field declared in a copybook is one node per program, because each program

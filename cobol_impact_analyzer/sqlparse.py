@@ -657,12 +657,15 @@ def _matching_paren(text: str, open_index: int) -> int:
     return len(text) - 1
 
 
+# A host variable, including the Pro*COBOL qualified form :RECORD.FIELD. Stopping
+# at the dot bound a WHERE column to the whole record instead of the field.
+_HOST_REF = r"[A-Za-z][A-Za-z0-9_\-#@$]*(?:\s*\.\s*[A-Za-z][A-Za-z0-9_\-#@$]*)*"
 _PREDICATE_RE = re.compile(
-    rf"({_QUALIFIED})\s*(=|<>|!=|>=|<=|>|<|(?:NOT\s+)?LIKE)\s*:\s*([A-Za-z][A-Za-z0-9_\-#@$]*)",
+    rf"({_QUALIFIED})\s*(=|<>|!=|>=|<=|>|<|(?:NOT\s+)?LIKE)\s*:\s*({_HOST_REF})",
     re.I,
 )
 _PREDICATE_REVERSED_RE = re.compile(
-    rf":\s*([A-Za-z][A-Za-z0-9_\-#@$]*)\s*(=|<>|!=|>=|<=|>|<)\s*({_QUALIFIED})",
+    rf":\s*({_HOST_REF})\s*(=|<>|!=|>=|<=|>|<)\s*({_QUALIFIED})",
     re.I,
 )
 
@@ -680,7 +683,7 @@ def _predicate_bindings(
             continue
         bindings.append(
             Binding(
-                host_var=match.group(3).upper(),
+                host_var=re.sub(r"\s+", "", match.group(3)).upper(),
                 column=column,
                 table=table,
                 direction=Direction.PREDICATE,
@@ -693,7 +696,7 @@ def _predicate_bindings(
             continue
         bindings.append(
             Binding(
-                host_var=match.group(1).upper(),
+                host_var=re.sub(r"\s+", "", match.group(1)).upper(),
                 column=column,
                 table=table,
                 direction=Direction.PREDICATE,

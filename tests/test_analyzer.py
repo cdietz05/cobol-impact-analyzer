@@ -1035,6 +1035,89 @@ class QualifiedReferenceTests(unittest.TestCase):
         self.assertIn("class='trace'", page)
 
 
+class ComparisonDoesNotFlowTests(unittest.TestCase):
+    """A field compared with a widened value is flagged, but holds none of it.
+
+    Shaped after a real trace: WHERE AT_REMN_DB > :HWS-UNBIL-BAL gave
+    HWS-UNBIL-BAL the balance width, which then flowed through COMPUTE into
+    HWS-AT-MPAY2, through UPDATE into COLLECTION_INFO.AT_MPAY_TWO, back out of
+    that column into another program's AT-MPAY-TWO, and round again - none of
+    which ever held a balance.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _analyze_sources(
+            {
+                "cubcl053.pco": """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUBCL053.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CU02TB34 END-EXEC.
+           EXEC SQL INCLUDE CU05TB02 END-EXEC.
+       01  HWS-AT-MPAY2             PIC S9(10)V9(2) COMP-3.
+       01  HWS-KY-BA                PIC X(10).
+       01  HWS-UNBIL-BAL            PIC S9(9)V9(2) COMP-3.
+       01  WS-CNT                   PIC S9(9) COMP.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT COUNT(*) INTO :WS-CNT FROM DB_ACTIVITY
+                WHERE KY_BA = :CU05TB02.KY-BA
+                  AND AT_REMN_DB > :HWS-UNBIL-BAL
+           END-EXEC
+           COMPUTE HWS-AT-MPAY2 = HWS-UNBIL-BAL
+                                + AT-MPAY-TWO OF CU02TB34
+           EXEC SQL
+               UPDATE COLLECTION_INFO
+                  SET AT_MPAY_TWO = :HWS-AT-MPAY2
+                WHERE KY_BA = :HWS-KY-BA
+           END-EXEC
+           GOBACK.
+""",
+                "cubcl001.pco": """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUBCL001.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CU02TB34 END-EXEC.
+       01  HWV-LAST-KY-BA           PIC X(10).
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT AT_MPAY_ONE, AT_MPAY_TWO
+                 INTO :CU02TB34.AT-MPAY-ONE, :CU02TB34.AT-MPAY-TWO
+                 FROM COLLECTION_INFO WHERE KY_BA = :HWV-LAST-KY-BA
+           END-EXEC
+           GOBACK.
+""",
+            },
+            {
+                "CU02TB34.cpy": """\
+       01  CU02TB34.
+           11  KY-CUST-NO           PIC X(10).
+           11  AT-MPAY-ONE          PIC S9(7)V9(2) COMP-3.
+           11  AT-MPAY-TWO          PIC S9(7)V9(2) COMP-3.
+""",
+                "CU05TB02.cpy": """\
+       01  CU05TB02.
+           05  KY-BA                PIC X(10).
+           05  AT-UNBIL-BAL         PIC S9(9)V9(2) COMP-3.
+""",
+            },
+            build_change("DB_ACTIVITY", "AT_REMN_DB", "NUMBER(11,2)", "NUMBER(13,2)"),
+        )
+
+    def test_the_compared_field_is_flagged_as_a_comparison(self):
+        [finding] = _find(self.result, "var:CUBCL053::HWS-UNBIL-BAL")
+        self.assertEqual(finding.category, "comparison")
+
+    def test_nothing_flows_on_from_the_compared_field(self):
+        flagged = {f.node_id for f in self.result.findings if f.category != "requested-change"}
+        self.assertEqual(flagged, {"var:CUBCL053::HWS-UNBIL-BAL"})
+
+
 class ReferenceModificationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

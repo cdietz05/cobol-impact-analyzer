@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25 19:08:05Z",
+  "generated_at": "2026-09-25 19:34:42Z",
   "spec": {
     "changes": [
       {
@@ -144,17 +144,17 @@
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 2,
       "propagation_path": [
-        "col:CUTBLA.CB_NAME",
-        "var:WVLOAD::WV-CUST-NAME",
+        "col:CUTBLA.CB_VALUE",
+        "var:WVLOAD::WV-VALUE",
         "var:WVLOAD::WV-CUTBLA-KEY"
       ],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
-          "line": 33,
+          "line": 31,
           "program": "WVLOAD",
           "paragraph": "",
-          "text": "05  WV-CUST-NAME PIC X(30)"
+          "text": "05  WV-VALUE PIC S9(10)V9(2)"
         },
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
@@ -179,8 +179,8 @@
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 3,
       "propagation_path": [
-        "col:CUTBLA.CB_NAME",
-        "var:WVLOAD::WV-CUST-NAME",
+        "col:CUTBLA.CB_VALUE",
+        "var:WVLOAD::WV-VALUE",
         "var:WVLOAD::WV-CUTBLA-KEY",
         "var:WVLOAD::WV-CUTBLA-VIEW"
       ],

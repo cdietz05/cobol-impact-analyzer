@@ -83,6 +83,11 @@ class _Settles:
             "propagation ran out of budget instead of converging",
         )
         self.assertLess(_widest(result), _SANE)
+        # Every trace begins at a changed column. A route rewritten around a
+        # loop used to start mid-loop, at a field nothing had widened.
+        seeds = {f"col:{c.table.upper()}.{c.column.upper()}" for c in result.spec.changes}
+        for finding in result.findings:
+            self.assertIn(finding.path[0], seeds, finding.path)
 
 
 class HandWrittenCycleTests(unittest.TestCase, _Settles):

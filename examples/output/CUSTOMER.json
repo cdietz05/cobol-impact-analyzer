@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25 19:08:05Z",
+  "generated_at": "2026-09-25 19:34:42Z",
   "spec": {
     "changes": [
       {
@@ -639,10 +639,10 @@
     },
     {
       "severity": "HIGH",
-      "category": "host-variable",
+      "category": "comparison",
       "node": "var:CUSTUPD::WS-SEARCH-NAME",
-      "title": "WS-SEARCH-NAME is too small for the widened value",
-      "detail": "Reached through a sql-predicate edge at examples/src/cust_update.pco:26. Current PIC holds alphanumeric(30), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "title": "WS-SEARCH-NAME is compared with the widened value",
+      "detail": "Compared through a sql-predicate edge at examples/src/cust_update.pco:26 with a value that grows to alphanumeric(60). Nothing moves that value into this field, so nothing is truncated here - but a key or search value compared with a wider field usually has to be as wide, or rows and matches are missed.",
       "notes": [],
       "current": "01 WS-SEARCH-NAME PIC X(30) DISPLAY",
       "required": "alphanumeric(60)",
@@ -671,10 +671,10 @@
     },
     {
       "severity": "HIGH",
-      "category": "host-variable",
+      "category": "comparison",
       "node": "var:ORDENTRY::WS-INVOICE-KEY",
-      "title": "WS-INVOICE-KEY is too small for the widened value",
-      "detail": "Reached through a sql-predicate edge at examples/src/order_entry.pco:21. Current PIC holds alphanumeric(40), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "title": "WS-INVOICE-KEY is compared with the widened value",
+      "detail": "Compared through a sql-predicate edge at examples/src/order_entry.pco:21 with a value that grows to alphanumeric(60). Nothing moves that value into this field, so nothing is truncated here - but a key or search value compared with a wider field usually has to be as wide, or rows and matches are missed.",
       "notes": [],
       "current": "01 WS-INVOICE-KEY PIC X(40) DISPLAY",
       "required": "alphanumeric(60)",
@@ -863,9 +863,9 @@
       "remediation": "Change to: 01 WS-REPORT-FLAT REDEFINES WS-REPORT-LINE PIC X(117).",
       "hops_from_change": 4,
       "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::RL-BALANCE",
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::RL-CUST-NAME",
         "var:CUSTUPD::WS-REPORT-LINE",
         "var:CUSTUPD::WS-REPORT-FLAT"
       ],
@@ -882,7 +882,73 @@
     {
       "severity": "MEDIUM",
       "category": "record-layout",
-      "node": "var:CUSTUPD::CUSTOMER-REC",
+      "node": "var:CUSTARCH::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "145 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME",
+        "var:CUSTARCH::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTARCH",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTLIST::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "145 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTLIST::CUST-NAME",
+        "var:CUSTLIST::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 6,
+          "program": "CUSTLIST",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTLIST",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTTBL::CUSTOMER-REC",
       "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
@@ -892,21 +958,87 @@
       "hops_from_change": 2,
       "propagation_path": [
         "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::CUSTOMER-REC"
+        "var:CUSTTBL::CUST-BALANCE",
+        "var:CUSTTBL::CUSTOMER-REC"
       ],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
           "line": 11,
-          "program": "CUSTUPD",
+          "program": "CUSTTBL",
           "paragraph": "",
           "text": "05  CUST-BALANCE         PIC S9(9)V99    COMP-3"
         },
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
           "line": 4,
+          "program": "CUSTTBL",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CUSTUPD::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "145 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 6,
           "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 4,
+          "program": "CUSTUPD",
+          "paragraph": "",
+          "text": "01  CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:ORDENTRY::CUSTOMER-REC",
+      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "114 bytes",
+      "required": "145 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CUSTOMER.CUST_NAME",
+        "var:ORDENTRY::CUST-NAME",
+        "var:ORDENTRY::CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 6,
+          "program": "ORDENTRY",
+          "paragraph": "",
+          "text": "05  CUST-NAME            PIC X(30)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
+          "line": 4,
+          "program": "ORDENTRY",
           "paragraph": "",
           "text": "01  CUSTOMER-REC"
         }
@@ -961,18 +1093,18 @@
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 3,
       "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::RL-BALANCE",
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTUPD::CUST-NAME",
+        "var:CUSTUPD::RL-CUST-NAME",
         "var:CUSTUPD::WS-REPORT-LINE"
       ],
       "references": [
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/WSCOMMON.cpy",
-          "line": 11,
+          "line": 7,
           "program": "CUSTUPD",
           "paragraph": "",
-          "text": "05  RL-BALANCE           PIC ZZ,ZZZ,ZZ9.99-"
+          "text": "05  RL-CUST-NAME         PIC X(30)"
         },
         {
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/WSCOMMON.cpy",
@@ -1027,62 +1159,6 @@
     {
       "severity": "MEDIUM",
       "category": "record-layout",
-      "node": "var:CUSTARCH::CUSTOMER-REC",
-      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
-      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
-      "current": "114 bytes",
-      "required": "145 bytes",
-      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::CUSTOMER-REC",
-        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy:4:CUSTOMER-REC",
-        "var:CUSTARCH::CUSTOMER-REC"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
-          "line": 4,
-          "program": "CUSTARCH",
-          "paragraph": "",
-          "text": "01  CUSTOMER-REC"
-        }
-      ]
-    },
-    {
-      "severity": "MEDIUM",
-      "category": "record-layout",
-      "node": "var:CUSTLIST::CUSTOMER-REC",
-      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
-      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
-      "current": "114 bytes",
-      "required": "145 bytes",
-      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::CUSTOMER-REC",
-        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy:4:CUSTOMER-REC",
-        "var:CUSTLIST::CUSTOMER-REC"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
-          "line": 4,
-          "program": "CUSTLIST",
-          "paragraph": "",
-          "text": "01  CUSTOMER-REC"
-        }
-      ]
-    },
-    {
-      "severity": "MEDIUM",
-      "category": "record-layout",
       "node": "var:CUSTPURG::CUSTOMER-REC",
       "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
@@ -1092,9 +1168,9 @@
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 4,
       "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::CUSTOMER-REC",
+        "col:CUSTOMER.CUST_NAME",
+        "var:CUSTARCH::CUST-NAME",
+        "var:CUSTARCH::CUSTOMER-REC",
         "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy:4:CUSTOMER-REC",
         "var:CUSTPURG::CUSTOMER-REC"
       ],
@@ -1103,62 +1179,6 @@
           "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
           "line": 4,
           "program": "CUSTPURG",
-          "paragraph": "",
-          "text": "01  CUSTOMER-REC"
-        }
-      ]
-    },
-    {
-      "severity": "MEDIUM",
-      "category": "record-layout",
-      "node": "var:CUSTTBL::CUSTOMER-REC",
-      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
-      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
-      "current": "114 bytes",
-      "required": "145 bytes",
-      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::CUSTOMER-REC",
-        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy:4:CUSTOMER-REC",
-        "var:CUSTTBL::CUSTOMER-REC"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
-          "line": 4,
-          "program": "CUSTTBL",
-          "paragraph": "",
-          "text": "01  CUSTOMER-REC"
-        }
-      ]
-    },
-    {
-      "severity": "MEDIUM",
-      "category": "record-layout",
-      "node": "var:ORDENTRY::CUSTOMER-REC",
-      "title": "CUSTOMER-REC: record length grows 114 -> 145 bytes",
-      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
-      "current": "114 bytes",
-      "required": "145 bytes",
-      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CUSTOMER.CUST_BALANCE",
-        "var:CUSTUPD::CUST-BALANCE",
-        "var:CUSTUPD::CUSTOMER-REC",
-        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy:4:CUSTOMER-REC",
-        "var:ORDENTRY::CUSTOMER-REC"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/copybooks/CUSTOMER.cpy",
-          "line": 4,
-          "program": "ORDENTRY",
           "paragraph": "",
           "text": "01  CUSTOMER-REC"
         }

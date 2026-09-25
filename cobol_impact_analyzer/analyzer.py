@@ -54,6 +54,13 @@ _LAYOUT = frozenset({EdgeKind.GROUP_PARENT, EdgeKind.REDEFINES})
 # physically as long as its storage. Every other edge passes on only the data
 # the program actually puts there - see ``carried`` in _propagate.
 _STORAGE_ONLY = _LAYOUT | {EdgeKind.SHARED_DECLARATION}
+# Edges where the target is compared with the value rather than given it: an
+# IF/EVALUATE operand, or a host variable in a SQL WHERE. The target is still
+# flagged - a search key usually needs the width of what it is compared with -
+# but no widened data is in it, so nothing flows on from it. Letting it flow
+# on turned WHERE AT_REMN_DB > :WS-X into "WS-X holds a balance" and flagged
+# every COMPUTE and UPDATE that later used WS-X.
+_NO_DATA = frozenset({EdgeKind.COMPARE, EdgeKind.SQL_PREDICATE})
 
 # The propagation guard: at most this many edge relaxations per run, or this
 # multiple of the edge count, whichever is larger. Both are named constants so a
@@ -239,6 +246,8 @@ class ImpactAnalyzer:
         # because another program needs it wider is not in here - see
         # _propagate.
         self._flow_reached: set[str] = set()
+        # Nodes some comparison says should be as wide as a widened value.
+        self._compared: set[str] = set()
         self._parents: dict[str, str] = {}
         # Pass-through edge (source, target, path, line) -> (callee node prefix,
         # LINKAGE item the value enters, LINKAGE item it leaves by).
@@ -752,6 +761,7 @@ class ImpactAnalyzer:
         # longer record really is longer, and moving it moves every byte, so
         # they carry the storage size.
         carried: dict[str, Capacity] = {}
+        compared: set[str] = set()
         # The part of ``carried`` that did not arrive from a caller through a
         # CALL argument. Only this goes back out through the callee's LINKAGE
         # items; what a caller passed in reaches its own arguments through the
@@ -853,15 +863,21 @@ class ImpactAnalyzer:
                     continue
                 if edge.kind.truncates and not target.capacity.covers(candidate):
                     truncated.add(edge.target_id)
+                if edge.kind in _NO_DATA and not target.capacity.covers(candidate):
+                    compared.add(edge.target_id)
                 grew_carried = False
-                if edge.kind is not EdgeKind.SHARED_DECLARATION:
+                if edge.kind is not EdgeKind.SHARED_DECLARATION and edge.kind not in _NO_DATA:
                     held = carried.get(edge.target_id)
                     if held is None or not held.covers(candidate):
                         carried[edge.target_id] = held.grown_to_hold(candidate) if held else candidate
                         grew_carried = True
                 # The clean lane: everything except what a caller passes in.
                 clean_candidate: Optional[Capacity] = None
-                if edge.kind is EdgeKind.SHARED_DECLARATION or edge.call_direction == "into":
+                if (
+                    edge.kind is EdgeKind.SHARED_DECLARATION
+                    or edge.kind in _NO_DATA
+                    or edge.call_direction == "into"
+                ):
                     pass
                 elif edge.kind in _LAYOUT or edge.call_direction == "back":
                     clean_candidate = candidate
@@ -884,9 +900,19 @@ class ImpactAnalyzer:
                     required[edge.target_id] = (
                         previous.grown_to_hold(candidate) if previous else candidate
                     )
-                    parents[edge.target_id] = node_id
-                    depth[edge.target_id] = current_depth + 1
-                    arriving[edge.target_id] = edge
+                    # The route shown for a node is how the change FIRST
+                    # reached it, and it is never rewritten by a later, wider
+                    # arrival. Rewriting it let a cycle - COMPUTE into a work
+                    # field, UPDATE a column with it, SELECT the column back -
+                    # overwrite the route with itself, and the trace began
+                    # mid-loop instead of at the changed column. The one
+                    # upgrade allowed: a route that only came through a
+                    # copybook link gives way to a real data flow, if that
+                    # cannot close a loop.
+                    if self._take_route(parents, arriving, edge, node_id):
+                        parents[edge.target_id] = node_id
+                        depth[edge.target_id] = current_depth + 1
+                        arriving[edge.target_id] = edge
                 elif not grew_carried:
                     continue
                 depth.setdefault(edge.target_id, current_depth + 1)
@@ -897,6 +923,7 @@ class ImpactAnalyzer:
         self.progress.step(processed, processed, f"{len(required)} node(s) affected")
         self._depth = depth
         self._parents = parents
+        self._compared = compared
         # Widened data actually reaches these: what arrives through this
         # program's own statements does not fit the field as declared.
         self._flow_reached = {
@@ -907,6 +934,29 @@ class ImpactAnalyzer:
         }
         self._truncated = truncated
         return required, self._reconstruct_paths(required, parents), arriving
+
+    @staticmethod
+    def _take_route(
+        parents: dict[str, str], arriving: dict[str, Edge], edge: Edge, source_id: str
+    ) -> bool:
+        """Whether ``edge`` from ``source_id`` should become the route to its target."""
+        target_id = edge.target_id
+        if target_id not in parents:
+            return True
+        current = arriving.get(target_id)
+        if current is None or current.kind is not EdgeKind.SHARED_DECLARATION:
+            return False
+        if edge.kind is EdgeKind.SHARED_DECLARATION:
+            return False
+        # Never make a node its own ancestor.
+        seen: set[str] = set()
+        walker: Optional[str] = source_id
+        while walker is not None and walker not in seen:
+            if walker == target_id:
+                return False
+            seen.add(walker)
+            walker = parents.get(walker)
+        return True
 
     def _candidate(
         self,
@@ -1270,6 +1320,26 @@ class ImpactAnalyzer:
         level = item.level if item is not None else 5
         new_declaration = _redeclare(declaration, current_pic, suggested)
         current = f"{level:02d} {node.name} PIC {current_pic or '(none)'} {usage}".strip()
+
+        if node.node_id not in self._flow_reached and node.node_id in self._compared:
+            return Finding(
+                severity=Severity.HIGH,
+                category="comparison",
+                node_id=node.node_id,
+                title=f"{node.name} is compared with the widened value",
+                detail=(
+                    f"Compared{_via(edge)} with a value that grows to {need.describe()}. "
+                    "Nothing moves that value into this field, so nothing is "
+                    "truncated here - but a key or search value compared with a wider "
+                    "field usually has to be as wide, or rows and matches are missed."
+                ),
+                current=current,
+                required=need.describe(),
+                remediation=f"Change to: {new_declaration}",
+                distance=distance,
+                path=path,
+                refs=refs,
+            )
 
         if node.node_id not in self._flow_reached:
             # Widened because its copybook is edited for another program; no
