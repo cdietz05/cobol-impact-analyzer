@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25 15:48:49Z",
+  "generated_at": "2026-09-25 18:48:53Z",
   "spec": {
     "changes": [
       {
@@ -37,7 +37,7 @@
   "summary": {
     "programs_scanned": 8,
     "nodes": 147,
-    "edges": 289,
+    "edges": 290,
     "findings": {
       "CRITICAL": 14,
       "HIGH": 8,

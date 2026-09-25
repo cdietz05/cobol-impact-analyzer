@@ -756,6 +756,275 @@ class CopybookSizeDoesNotFlowTests(unittest.TestCase):
         self.assertEqual(finding.category, "copybook-field")
 
 
+def _analyze_sources(sources: dict[str, str], copybooks: dict[str, str], *changes):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "src").mkdir()
+        (root / "cpy").mkdir()
+        for name, text in sources.items():
+            (root / "src" / name).write_text(text)
+        for name, text in copybooks.items():
+            (root / "cpy" / name).write_text(text)
+        return analyze(
+            ChangeSpec(
+                changes=list(changes),
+                source_paths=[root / "src"],
+                copybook_paths=[root / "cpy"],
+                source_patterns=["*.pco"],
+            )
+        )
+
+
+_AT_COPYBOOK = """\
+       01  AT-REC.
+           05  AT-ID                PIC S9(9) COMP-3.
+           05  AT-DB                PIC S9(9)V99 COMP-3.
+           05  AT-REMN-DB           PIC S9(9)V99 COMP-3.
+           05  AT-DATE              PIC 9(8).
+"""
+
+_AT_WIDENING = (
+    build_change("AT_TBL", "AT_REMN_DB", "NUMBER(11,2)", "NUMBER(13,2)"),
+)
+
+
+class CursorDeclaredAfterFetchTests(unittest.TestCase):
+    """A program's own DECLARE wins, wherever it sits in the source."""
+
+    @classmethod
+    def setUpClass(cls):
+        other = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. AOTHER.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE ATREC END-EXEC.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               DECLARE C1 CURSOR FOR
+               SELECT AT_ID, AT_DATE, AT_REMN_DB FROM AT_TBL
+           END-EXEC
+           GOBACK.
+"""
+        program = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PROG.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE ATREC END-EXEC.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           PERFORM 9000-DECLARE
+           EXEC SQL OPEN C1 END-EXEC
+           EXEC SQL
+               FETCH C1 INTO :AT-ID, :AT-REMN-DB, :AT-DB
+           END-EXEC
+           GOBACK.
+       9000-DECLARE.
+           EXEC SQL
+               DECLARE C1 CURSOR FOR
+               SELECT AT_ID, AT_REMN_DB, AT_DB FROM AT_TBL
+           END-EXEC.
+"""
+        cls.result = _analyze_sources(
+            {"aother.pco": other, "prog.pco": program}, {"ATREC.cpy": _AT_COPYBOOK}, *_AT_WIDENING
+        )
+
+    def test_the_fetch_uses_this_programs_own_select_list(self):
+        [finding] = _find(self.result, "var:PROG::AT-REMN-DB")
+        self.assertEqual(finding.path, ["col:AT_TBL.AT_REMN_DB", "var:PROG::AT-REMN-DB"])
+
+    def test_a_same_named_cursor_elsewhere_is_not_borrowed(self):
+        self.assertFalse([w for w in self.result.warnings if "borrowed" in w and "prog.pco" in w])
+        self.assertFalse(
+            [f for f in _find(self.result, "var:PROG::AT-DB") if f.category != "copybook-field"]
+        )
+
+
+class SharedSubprogramTests(unittest.TestCase):
+    """A value one caller passes in does not come back out to another caller."""
+
+    @classmethod
+    def setUpClass(cls):
+        caller_a = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PA.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE ATREC END-EXEC.
+       01  WS-OUT                   PIC X(12).
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT AT_REMN_DB INTO :AT-REMN-DB FROM AT_TBL
+           END-EXEC
+           CALL 'UTIL' USING AT-REMN-DB WS-OUT
+           GOBACK.
+"""
+        caller_b = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE ATREC END-EXEC.
+       01  WS-OUT                   PIC X(12).
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           CALL 'UTIL' USING AT-DATE WS-OUT
+           GOBACK.
+"""
+        util = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. UTIL.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  LK-VALUE                 PIC S9(11)V99.
+       01  LK-TEXT                  PIC X(12).
+       PROCEDURE DIVISION USING LK-VALUE LK-TEXT.
+       0000-MAIN.
+           MOVE LK-VALUE TO LK-TEXT
+           GOBACK.
+"""
+        cls.result = _analyze_sources(
+            {"pa.pco": caller_a, "pb.pco": caller_b, "util.pco": util},
+            {"ATREC.cpy": _AT_COPYBOOK},
+            *_AT_WIDENING,
+        )
+
+    def test_another_callers_argument_is_not_flagged(self):
+        # PB passes a date in the same position PA passes the balance.
+        self.assertFalse(_find(self.result, "var:PB::AT-DATE"))
+        self.assertFalse(_find(self.result, "var:PB::WS-OUT"))
+
+    def test_a_value_the_callee_moves_to_another_parameter_reaches_its_own_caller(self):
+        # UTIL moves LK-VALUE into LK-TEXT, so PA's WS-OUT receives PA's
+        # widened balance, through the callee's own MOVE.
+        [finding] = _find(self.result, "var:PA::WS-OUT")
+        self.assertIn("X(", finding.remediation)
+
+
+_QUALIFIED_PROGRAM = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CUBCE100.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CU02TB04 END-EXEC.
+           EXEC SQL INCLUDE CU02TB05 END-EXEC.
+       01  VS-CD-DB-STAT            PIC X(02).
+       01  VS-CD-BUS                PIC X(02).
+       01  WS-UNBILL-TOTAL          PIC S9(11)V99 COMP-3.
+       01  WS-DEBIT-DATE            PIC X(10).
+       PROCEDURE DIVISION.
+       A8000-OPEN.
+           MOVE VS-CD-DB-STAT TO CD-DB-STAT OF CU02TB04.
+           MOVE VS-CD-BUS     TO CD-BUS OF CU02TB04.
+           EXEC SQL
+               DECLARE CEP_DEBIT CURSOR FOR
+               SELECT   AT_REMN_DB,
+                        CD_CITY_CNTY,
+                        AT_DB,
+                        DT_DB,
+                        KY_PROD_ORDNO,
+                        CD_BUS,
+                        CD_PROD,
+                        CD_BILL_TYPE,
+                        KY_DB_SEQ_NO
+                 FROM   DB_ACTIVITY
+                WHERE   KY_BA        = :CU02TB04.KY-BA        AND
+                        AT_REMN_DB   > :CU02TB04.AT-REMN-DB   AND
+                        CD_DB_STAT   = :CU02TB04.CD-DB-STAT   AND
+                        CD_BUS       = :CU02TB04.CD-BUS
+             ORDER BY   CD_BUS,
+                        KY_PROD_ORDNO,
+                        KY_DB_SEQ_NO
+           END-EXEC.
+           EXEC SQL
+               OPEN CEP_DEBIT
+           END-EXEC.
+       A8120-FETCH.
+           EXEC SQL
+               FETCH  CEP_DEBIT
+               INTO   :CU02TB04.AT-REMN-DB,
+                      :CU02TB04.CD-CITY-CNTY,
+                      :CU02TB04.AT-DB,
+                      :CU02TB04.DT-DB,
+                      :CU02TB04.KY-PROD-ORDNO,
+                      :CU02TB04.CD-BUS,
+                      :CU02TB04.CD-PROD,
+                      :CU02TB04.CD-BILL-TYPE,
+                      :CU02TB04.KY-DB-SEQ-NO
+           END-EXEC.
+           ADD AT-REMN-DB OF CU02TB04 TO WS-UNBILL-TOTAL.
+           IF DT-DB OF CU02TB04 > WS-DEBIT-DATE
+               MOVE DT-DB OF CU02TB04 TO WS-DEBIT-DATE
+           END-IF.
+           MOVE AT-DB OF CU02TB05 TO AT-DB OF CU02TB04.
+"""
+
+_QUALIFIED_TB04 = """\
+       01  CU02TB04.
+           05  KY-BA                PIC X(10).
+           05  AT-REMN-DB           PIC S9(9)V99 COMP-3.
+           05  CD-CITY-CNTY         PIC X(04).
+           05  AT-DB                PIC S9(9)V99 COMP-3.
+           05  DT-DB                PIC X(10).
+           05  KY-PROD-ORDNO        PIC X(12).
+           05  CD-BUS               PIC X(02).
+           05  CD-PROD              PIC X(04).
+           05  CD-BILL-TYPE         PIC X(02).
+           05  KY-DB-SEQ-NO         PIC S9(5) COMP-3.
+           05  CD-DB-STAT           PIC X(02).
+"""
+
+_QUALIFIED_TB05 = """\
+       01  CU02TB05.
+           05  AT-DB                PIC S9(9)V99 COMP-3.
+           05  DT-DB                PIC X(10).
+"""
+
+
+class QualifiedReferenceTests(unittest.TestCase):
+    """:CU02TB04.AT-DB and AT-DB OF CU02TB04 name one field, in one record.
+
+    Shaped after a real Pro*COBOL program: every host variable is written
+    :RECORD.FIELD, every COBOL reference FIELD OF RECORD, and a second record
+    declares some of the same field names. Before, the whole FETCH was dropped
+    (the qualified host variables matched nothing), AT_DB was reported as never
+    referenced, the record CU02TB04 was read as an operand of IF DT-DB OF
+    CU02TB04 > WS-DEBIT-DATE - flagging the date for the record's width - and
+    CU02TB05's AT-DB and DT-DB did not exist at all.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _analyze_sources(
+            {"cubce100.pco": _QUALIFIED_PROGRAM},
+            {"CU02TB04.cpy": _QUALIFIED_TB04, "CU02TB05.cpy": _QUALIFIED_TB05},
+            build_change("DB_ACTIVITY", "AT_REMN_DB", "NUMBER(11,2)", "NUMBER(13,2)"),
+            build_change("DB_ACTIVITY", "AT_DB", "NUMBER(11,2)", "NUMBER(13,2)"),
+        )
+
+    def test_qualified_host_variables_are_traced(self):
+        self.assertFalse([w for w in self.result.warnings if "is not declared" in w])
+        self.assertTrue(_find(self.result, "var:CUBCE100::AT-REMN-DB"))
+
+    def test_a_column_fetched_through_a_qualified_host_variable_is_found(self):
+        self.assertFalse([f for f in self.result.findings if f.category == "coverage-gap"])
+        [finding] = _find(self.result, "var:CUBCE100::AT-DB OF CU02TB04")
+        self.assertEqual(finding.path[0], "col:DB_ACTIVITY.AT_DB")
+
+    def test_the_record_is_not_an_operand_of_a_qualified_comparison(self):
+        self.assertFalse(_find(self.result, "var:CUBCE100::WS-DEBIT-DATE"))
+
+    def test_the_other_records_same_named_fields_stay_separate(self):
+        self.assertFalse(_find(self.result, "var:CUBCE100::AT-DB OF CU02TB05"))
+        self.assertFalse(_find(self.result, "var:CUBCE100::DT-DB OF CU02TB05"))
+
+    def test_the_accumulator_fed_by_a_qualified_add_is_found(self):
+        self.assertTrue(_find(self.result, "var:CUBCE100::WS-UNBILL-TOTAL"))
+
+
 class ReferenceModificationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

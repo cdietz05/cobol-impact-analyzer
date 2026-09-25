@@ -89,6 +89,9 @@ class DataMap:
     order: list[str] = field(default_factory=list)
     roots: list[str] = field(default_factory=list)
     origin: str = ""
+    # name -> keys of every item declared with it, in declaration order. Built
+    # on first lookup and dropped whenever the map changes.
+    _by_name: Optional[dict[str, list[str]]] = field(default=None, repr=False, compare=False)
 
     def add(self, item: Field) -> None:
         key = normalize_name(item.name)
@@ -104,21 +107,106 @@ class DataMap:
             key = f"{key}!{len(self.order)}"
         self.fields[key] = item
         self.order.append(key)
+        self._by_name = None
 
     def get(self, name: str) -> Optional[Field]:
         return self.fields.get(normalize_name(name))
 
+    def keys_named(self, name: str) -> list[str]:
+        """Keys of every item declared as ``name`` - more than one when two
+        records in the program use the same field name."""
+        if self._by_name is None:
+            index: dict[str, list[str]] = {}
+            for key in self.order:
+                item = self.fields[key]
+                if item.level != 88:
+                    index.setdefault(normalize_name(item.name), []).append(key)
+            self._by_name = index
+        return self._by_name.get(normalize_name(name), [])
+
+    def resolve(self, name: str, qualifiers: Sequence[str] = ()) -> Optional[str]:
+        """The key ``name OF q1 OF q2 ...`` refers to, or None.
+
+        COBOL only lets a program use an ambiguous name qualified, so a name
+        declared once resolves directly, and a duplicated one resolves through
+        its qualifiers - each must be an ancestor of the item, innermost first.
+        Resolving every AT-REMN-DB to the first one declared merged fields of
+        different records into one, and one record's change leaked into the
+        other's.
+        """
+        keys = self.keys_named(name)
+        if not keys:
+            return None
+        wanted = [normalize_name(q) for q in qualifiers if q]
+        if not wanted:
+            return keys[0]
+        for key in keys:
+            if self._has_ancestors(key, wanted):
+                return key
+        # A qualifier we cannot place (a record the scan never saw) should not
+        # lose a name that is only declared once.
+        return keys[0] if len(keys) == 1 else None
+
+    def _has_ancestors(self, key: str, wanted: list[str]) -> bool:
+        position = 0
+        current = self.fields[key].parent
+        seen: set[str] = set()
+        while current and current not in seen and position < len(wanted):
+            seen.add(current)
+            parent = self.fields.get(current)
+            if parent is None:
+                break
+            if normalize_name(parent.name) == wanted[position]:
+                position += 1
+            current = parent.parent
+        return position == len(wanted)
+
     def merge(self, other: "DataMap") -> None:
+        """Add ``other``'s items, keeping same-named fields of other records.
+
+        A second record declaring AT-DB (another table's copybook, or a save
+        area in WORKING-STORAGE) used to be dropped here outright, so every
+        ``AT-DB OF`` that record resolved to the first record's field instead.
+        Such items are re-keyed the way ``add`` re-keys a duplicate, with their
+        parent and child links following. Only a true re-include - the same
+        declaration from the same file and line - is still skipped.
+        """
+        rename: dict[str, str] = {}
         for key in other.order:
             item = other.fields[key]
-            if key not in self.fields:
-                self.fields[key] = item
-                self.order.append(key)
-        self.roots.extend(other.roots)
+            existing = self.fields.get(key)
+            if existing is not None and _same_declaration(existing, item):
+                continue
+            new_key = key
+            while new_key in self.fields:
+                new_key = f"{normalize_name(item.name)}!{len(self.order)}"
+                if new_key in self.fields:
+                    new_key = f"{new_key}!"
+            rename[key] = new_key
+            self.fields[new_key] = item
+            self.order.append(new_key)
+        for key, new_key in rename.items():
+            item = self.fields[new_key]
+            if item.parent:
+                item.parent = rename.get(item.parent, item.parent)
+            item.children = [rename.get(child, child) for child in item.children]
+        self.roots.extend(rename.get(root, root) for root in other.roots if root in rename)
+        self._by_name = None
 
     def iter_fields(self) -> Iterable[Field]:
         for key in self.order:
             yield self.fields[key]
+
+
+def _same_declaration(left: Field, right: Field) -> bool:
+    """Two parses of one declaration: the same copybook included twice."""
+    if left.source is None or right.source is None:
+        return False
+    return (
+        left.source.path == right.source.path
+        and left.source.line == right.source.line
+        and normalize_name(left.name) == normalize_name(right.name)
+    )
 
 
 class CopybookResolver:

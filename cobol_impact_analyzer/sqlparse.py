@@ -96,8 +96,12 @@ _NON_COLUMN_TOKENS = frozenset(
     """
     NULL SYSDATE SYSTIMESTAMP USER CURRENT_DATE CURRENT_TIMESTAMP DEFAULT
     AND OR NOT IN IS LIKE BETWEEN EXISTS FROM WHERE VALUES SET SELECT INTO
+    CASE WHEN THEN ELSE END DISTINCT ALL UNIQUE ROWNUM ROWID LEVEL DUAL
     """.split()
 )
+
+# A select list may open with a set quantifier, which is not the first column.
+_SET_QUANTIFIER_RE = re.compile(r"^\s*(?:DISTINCT|UNIQUE|ALL)\s+", re.I)
 
 
 def strip_sql_comments(text: str) -> str:
@@ -229,7 +233,15 @@ def _column_of(expression: str, aliases: dict[str, str], default_table: str) -> 
 
 
 def columns_in_expression(expr: str, aliases: dict[str, str], default_table: str) -> list[tuple[str, str]]:
-    """Every column-looking identifier inside an expression."""
+    """Every column-looking identifier inside an expression, each once.
+
+    Quoted literals (a TO_CHAR format such as 'Mon DD, YYYY'), host variables
+    and the type after AS in a CAST are removed first; left in, their words
+    read as column names.
+    """
+    expr = re.sub(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"", " ", expr)
+    expr = _HOST_VAR_RE.sub(" ", expr)
+    expr = re.sub(rf"\bAS\s+{_IDENT}(?:\s*\([^()]*\))?", " ", expr, flags=re.I)
     found: list[tuple[str, str]] = []
     for match in re.finditer(rf"(?<![:.\w])({_IDENT})\s*\.\s*({_IDENT})|(?<![:.\w])({_IDENT})", expr):
         if match.group(1):
@@ -244,7 +256,57 @@ def columns_in_expression(expr: str, aliases: dict[str, str], default_table: str
         if tail.startswith("("):
             continue
         found.append((default_table, name))
-    return found
+    return list(dict.fromkeys(found))
+
+
+def _select_item_bindings(
+    expression: str,
+    host: str,
+    indicator: str,
+    aliases: dict[str, str],
+    default_table: str,
+) -> list[Binding]:
+    """Bindings for one select-list item fetched into ``host``.
+
+    A bare column binds to it directly. An expression - NVL(AT_DB, 0), ROUND,
+    TO_CHAR, CASE, DECODE, arithmetic, || - binds every column it reads. It
+    used to bind none, so a column wrapped in NVL was never traced at all.
+    """
+    table, column, expr_note = _column_of(expression, aliases, default_table)
+    if not expr_note:
+        return [
+            Binding(
+                host_var=host,
+                column=column,
+                table=table,
+                direction=Direction.OUT,
+                indicator=indicator,
+            )
+        ]
+    columns = columns_in_expression(expr_note, aliases, default_table)
+    note = f"value derived from the expression {expr_note}"
+    if not columns:
+        return [
+            Binding(
+                host_var=host,
+                direction=Direction.OUT,
+                indicator=indicator,
+                expression=expr_note,
+                note=note,
+            )
+        ]
+    return [
+        Binding(
+            host_var=host,
+            column=name,
+            table=owner,
+            direction=Direction.OUT,
+            indicator=indicator,
+            expression=expr_note,
+            note=note,
+        )
+        for owner, name in columns
+    ]
 
 
 class SqlAnalyzer:
@@ -346,7 +408,7 @@ class SqlAnalyzer:
         from_index = find_keyword(text, "FROM")
 
         select_end = into_index if 0 <= into_index < (from_index if from_index != -1 else len(text)) else from_index
-        select_list = text[6:select_end if select_end != -1 else len(text)]
+        select_list = _SET_QUANTIFIER_RE.sub("", text[6:select_end if select_end != -1 else len(text)])
 
         if from_index != -1:
             where_index = find_keyword(text, "WHERE", from_index)
@@ -381,18 +443,11 @@ class SqlAnalyzer:
                         "SELECT * cannot be mapped to columns without table DDL"
                     )
                     continue
-                table, column, expr_note = _column_of(expression, statement.aliases, default_table)
-                binding = Binding(
-                    host_var=host,
-                    column=column,
-                    table=table,
-                    direction=Direction.OUT,
-                    indicator=indicator,
-                    expression=expr_note,
+                statement.bindings.extend(
+                    _select_item_bindings(
+                        expression, host, indicator, statement.aliases, default_table
+                    )
                 )
-                if expr_note:
-                    binding.note = "value derived from an expression"
-                statement.bindings.append(binding)
 
         if where_index != -1:
             statement.bindings.extend(
@@ -541,18 +596,11 @@ class SqlAnalyzer:
             if expression == "*":
                 statement.unresolved.append("cursor selects *; column mapping needs table DDL")
                 continue
-            table, column, expr_note = _column_of(expression, declaration.aliases, default_table)
-            binding = Binding(
-                host_var=host,
-                column=column,
-                table=table,
-                direction=Direction.OUT,
-                indicator=indicator,
-                expression=expr_note,
+            statement.bindings.extend(
+                _select_item_bindings(
+                    expression, host, indicator, declaration.aliases, default_table
+                )
             )
-            if expr_note:
-                binding.note = "value derived from an expression"
-            statement.bindings.append(binding)
         return statement
 
     def _parse_open(self, text: str, ref: SourceRef) -> SqlStatement:
@@ -578,7 +626,7 @@ def _cursor_select_list(declaration: SqlStatement) -> list[str]:
         return []
     from_index = find_keyword(body, "FROM", select_index)
     end = from_index if from_index != -1 else len(body)
-    return split_top_level(body[select_index + 6 : end])
+    return split_top_level(_SET_QUANTIFIER_RE.sub("", body[select_index + 6 : end]))
 
 
 def _matching_paren(text: str, open_index: int) -> int:

@@ -380,6 +380,10 @@ class Edge:
     # STRING only: characters of quoted literals in the same statement. They
     # take room in the target on top of the data items.
     extra_chars: int = 0
+    # CALL_ARG only: "into" runs caller -> callee, "back" callee -> caller. A
+    # value a caller passes in must not come back out to a DIFFERENT caller,
+    # so the two directions are told apart - see _propagate.
+    call_direction: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {

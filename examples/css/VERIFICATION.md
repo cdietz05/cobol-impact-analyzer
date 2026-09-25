@@ -10,7 +10,7 @@ Change: `CSS_CUSTOMER.CUST_NAME` `VARCHAR2(30) → VARCHAR2(40)` and
 `CSS_CUSTOMER.CUST_BALANCE` `NUMBER(11,2) → NUMBER(13,2)`.
 
 Result: 8 programs scanned, 8 affected, 3 recompile-only, 0 coverage warnings,
-219 graph nodes / 453 edges. Findings: CRITICAL 23, HIGH 11, MEDIUM 12, LOW 11, INFO 2.
+219 graph nodes / 455 edges. Findings: CRITICAL 23, HIGH 11, MEDIUM 12, LOW 11, INFO 2.
 
 ## What each chain proves
 

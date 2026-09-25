@@ -224,5 +224,39 @@ class ProgramParsingTests(unittest.TestCase):
         )
 
 
+
+class SelectExpressionTests(unittest.TestCase):
+    """A select-list item that is an expression still binds the columns it reads."""
+
+    def _fetch(self, select_list, into):
+        analyzer = SqlAnalyzer()
+        ref = SourceRef(path="x.pco", line=1)
+        analyzer.parse(f"DECLARE C1 CURSOR FOR SELECT {select_list} FROM AT_TBL", ref)
+        statement = analyzer.parse(f"FETCH C1 INTO {into}", ref)
+        return {(b.column, b.host_var) for b in statement.bindings if b.column}
+
+    def test_nvl_binds_the_column_inside_it(self):
+        bound = self._fetch("AT_ID, NVL(AT_DB, 0)", ":AT-ID, :AT-DB")
+        self.assertIn(("AT_DB", "AT-DB"), bound)
+
+    def test_a_format_string_is_not_read_as_columns(self):
+        bound = self._fetch("TO_CHAR(AT_DATE, 'Mon DD, YYYY')", ":AT-DATE")
+        self.assertEqual(bound, {("AT_DATE", "AT-DATE")})
+
+    def test_every_column_an_expression_reads_is_bound(self):
+        bound = self._fetch("CASE WHEN AT_DB > 0 THEN AT_REMN_DB ELSE 0 END", ":AT-AMT")
+        self.assertEqual(bound, {("AT_DB", "AT-AMT"), ("AT_REMN_DB", "AT-AMT")})
+
+    def test_distinct_is_not_the_first_column(self):
+        bound = self._fetch("DISTINCT AT_ID, AT_DB", ":AT-ID, :AT-DB")
+        self.assertEqual(bound, {("AT_ID", "AT-ID"), ("AT_DB", "AT-DB")})
+
+    def test_select_into_binds_expressions_too(self):
+        statement = SqlAnalyzer().parse(
+            "SELECT NVL(AT_DB, 0) INTO :AT-DB FROM AT_TBL", SourceRef(path="x.pco", line=1)
+        )
+        self.assertIn(("AT_DB", "AT-DB"), {(b.column, b.host_var) for b in statement.bindings})
+
+
 if __name__ == "__main__":
     unittest.main()

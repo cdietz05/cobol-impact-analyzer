@@ -60,6 +60,9 @@ _STORAGE_ONLY = _LAYOUT | {EdgeKind.SHARED_DECLARATION}
 # test can lower them rather than having to build a fixture big enough to trip
 # the real cap.
 _MIN_RELAXATION_BUDGET = 200_000
+# Edge relaxations allowed when running one caller's value through a callee.
+# A subprogram's own graph is small; this only stops a pathological one.
+_PASS_THROUGH_STEPS = 20_000
 _RELAXATION_BUDGET_FACTOR = 20
 
 # Mentions of a field that carry no width but break when it grows. Folded into
@@ -231,6 +234,10 @@ class ImpactAnalyzer:
         # because another program needs it wider is not in here - see
         # _propagate.
         self._flow_reached: set[str] = set()
+        # Pass-through edge (source, target, path, line) -> (callee node prefix,
+        # LINKAGE item the value enters, LINKAGE item it leaves by).
+        self._pass_through: dict[tuple[str, str, str, int], tuple[str, str, str]] = {}
+        self._inside_callee: set[tuple[str, str]] = set()
         # Nodes some truncating edge (MOVE, fetch, STRING...) delivered more to
         # than they can hold. Severity comes from this, not from whichever edge
         # happened to grow the node last - a copybook or CALL link arriving
@@ -340,18 +347,18 @@ class ImpactAnalyzer:
             item = program.data.fields[key]
             if item.level == 88:
                 continue
-            node_id = self._variable_id(program, item)
+            node_id = self._variable_id(program, item, key)
             node = Node(
                 node_id=node_id,
                 kind=NodeKind.VARIABLE,
-                name=item.name,
+                name=_display_name(program, key),
                 capacity=_effective_capacity(item),
                 declared_in=item.source,
                 field_ref=item,
                 programs={program.name},
             )
             self.graph.add_node(node)
-            self._field_nodes[(program.name, item.name)] = node_id
+            self._field_nodes[(program.name, key)] = node_id
             self._field_nodes_loose.setdefault((program.name, _loose(item.name)), node_id)
             self._node_fields.setdefault(node_id, []).append((program, item))
 
@@ -365,7 +372,7 @@ class ImpactAnalyzer:
                 table = binding.table or (statement.tables[0] if statement.tables else "")
                 if not table:
                     continue
-                variable_id = self._field_nodes.get((program.name, binding.host_var))
+                variable_id = self._host_variable_node(program, binding.host_var)
                 if variable_id is None:
                     # SQL columns are spelled with underscores and COBOL fields
                     # with hyphens, and the two do get mixed up. Only fall back
@@ -453,20 +460,22 @@ class ImpactAnalyzer:
             item = program.data.fields[key]
             if item.level == 88:
                 continue
-            child_id = self._field_nodes.get((program.name, item.name))
+            child_id = self._field_nodes.get((program.name, key))
             if child_id is None:
                 continue
             if item.parent:
                 parent = program.data.fields.get(item.parent)
                 if parent is not None:
-                    parent_id = self._field_nodes.get((program.name, parent.name))
+                    parent_id = self._field_nodes.get((program.name, item.parent))
                     if parent_id:
                         ref = item.source or SourceRef(path=program.path, line=0)
                         self.graph.add_edge(
                             Edge(child_id, parent_id, EdgeKind.GROUP_PARENT, ref, "group member")
                         )
             if item.redefines:
-                other_id = self._field_nodes.get((program.name, item.redefines))
+                other_id = self._field_nodes.get(
+                    (program.name, _redefined_key(program, key, item))
+                )
                 if other_id:
                     ref = item.source or SourceRef(path=program.path, line=0)
                     # Directional. The overlaid item must be big enough to hold
@@ -483,6 +492,12 @@ class ImpactAnalyzer:
 
     def _add_call_edges(self) -> None:
         by_name = {program.name: program for program in self.programs}
+        # (callee name, CALL label, ref, [(position, caller node, callee node)])
+        sites: list[tuple[str, str, SourceRef, list[tuple[int, str, str]]]] = []
+        # --global-vars merges same-named fields across programs, so there is
+        # no per-program node to be context-sensitive about; keep CALL edges
+        # symmetric there, as they always were.
+        directed = not self.spec.global_variable_scope
         for program in self.programs:
             for call in program.calls:
                 callees = self._call_targets(program, call, by_name)
@@ -492,22 +507,95 @@ class ImpactAnalyzer:
                     continue
                 for callee in callees:
                     label = call.target if not call.dynamic else f"{call.target} -> {callee.name}"
+                    pairs: list[tuple[int, str, str]] = []
                     for position, argument in enumerate(call.args):
                         if position >= len(callee.linkage_using):
                             continue
                         caller_id = self._field_nodes.get((program.name, argument))
-                        callee_id = self._field_nodes.get(
-                            (callee.name, callee.linkage_using[position])
-                        )
+                        callee_key = callee.data.resolve(callee.linkage_using[position])
+                        callee_id = self._field_nodes.get((callee.name, callee_key or ""))
                         if not caller_id or not callee_id:
                             continue
                         note = f"argument {position + 1} of CALL {label}"
                         self.graph.add_edge(
-                            Edge(caller_id, callee_id, EdgeKind.CALL_ARG, call.ref, note)
+                            Edge(
+                                caller_id,
+                                callee_id,
+                                EdgeKind.CALL_ARG,
+                                call.ref,
+                                note,
+                                call_direction="into" if directed else "",
+                            )
                         )
                         self.graph.add_edge(
-                            Edge(callee_id, caller_id, EdgeKind.CALL_ARG, call.ref, note)
+                            Edge(
+                                callee_id,
+                                caller_id,
+                                EdgeKind.CALL_ARG,
+                                call.ref,
+                                note,
+                                call_direction="back" if directed else "",
+                            )
                         )
+                        pairs.append((position, caller_id, callee_id))
+                    if directed and len(pairs) > 1:
+                        sites.append((callee.name, label, call.ref, pairs))
+        self._add_pass_through_edges(sites)
+
+    def _add_pass_through_edges(
+        self, sites: list[tuple[str, str, SourceRef, list[tuple[int, str, str]]]]
+    ) -> None:
+        """Link a caller's own arguments where the callee moves one into another.
+
+        A value a caller passes in only comes back to THAT caller. Sending it
+        back through the callee's LINKAGE item reached every caller of the
+        subprogram: one program's CALL 'UTIL' USING AT-REMN-DB flagged another
+        program's CALL 'UTIL' USING AT-DATE, which never held a balance at all.
+
+        So the return path carries only what the callee itself puts in a
+        LINKAGE item (see _propagate), and where the callee moves parameter i
+        into parameter j, each call site gets a direct edge between its own
+        arguments i and j instead. Repeated to a fixed point so a pass-through
+        that goes via a nested CALL is found too.
+        """
+        changed = True
+        while changed:
+            changed = False
+            for callee, label, ref, pairs in sites:
+                prefix = f"var:{callee}::"
+                for position, caller_from, linkage_from in pairs:
+                    reached = self._reachable_within(linkage_from, prefix)
+                    for other, caller_to, linkage_to in pairs:
+                        if other == position or linkage_to not in reached:
+                            continue
+                        note = (
+                            f"CALL {label} moves argument {position + 1} "
+                            f"into argument {other + 1}"
+                        )
+                        before = len(self.graph.successors(caller_from))
+                        self.graph.add_edge(
+                            Edge(caller_from, caller_to, EdgeKind.CALL_ARG, ref, note)
+                        )
+                        if len(self.graph.successors(caller_from)) != before:
+                            changed = True
+                            self._pass_through[(caller_from, caller_to, ref.path, ref.line)] = (
+                                prefix,
+                                linkage_from,
+                                linkage_to,
+                            )
+
+    def _reachable_within(self, start: str, prefix: str) -> set[str]:
+        """Nodes of one program reachable from ``start`` without leaving it."""
+        seen = {start}
+        stack = [start]
+        while stack:
+            for edge in self.graph.successors(stack.pop()):
+                target = edge.target_id
+                if edge.call_direction or target in seen or not target.startswith(prefix):
+                    continue
+                seen.add(target)
+                stack.append(target)
+        return seen
 
     def _add_shared_declarations(self) -> None:
         """Join every program's copy of one copybook declaration.
@@ -532,7 +620,7 @@ class ImpactAnalyzer:
                     continue
                 if Path(item.source.path) == program_path:
                     continue  # declared inline, not in a copybook
-                node_id = self._field_nodes.get((program.name, item.name))
+                node_id = self._field_nodes.get((program.name, key))
                 if node_id is None:
                     continue
                 # Name is left out on purpose: COPY REPLACING gives the same
@@ -655,6 +743,11 @@ class ImpactAnalyzer:
         # longer record really is longer, and moving it moves every byte, so
         # they carry the storage size.
         carried: dict[str, Capacity] = {}
+        # The part of ``carried`` that did not arrive from a caller through a
+        # CALL argument. Only this goes back out through the callee's LINKAGE
+        # items; what a caller passed in reaches its own arguments through the
+        # pass-through edges instead (_add_pass_through_edges).
+        clean: dict[str, Capacity] = {}
         truncated: set[str] = set()
         # STRING targets and group items are sized by adding up what every
         # source brought, not by the largest single one. Kept as a running
@@ -678,6 +771,7 @@ class ImpactAnalyzer:
             node_id = _column_id(change.table, change.column)
             required[node_id] = change.new_capacity
             carried[node_id] = change.new_capacity
+            clean[node_id] = change.new_capacity
             depth[node_id] = 0
             queue.append(node_id)
             queued.add(node_id)
@@ -718,6 +812,7 @@ class ImpactAnalyzer:
                 continue
             source_required = required[node_id]
             source_carried = carried.get(node_id)
+            source_clean = clean.get(node_id)
             for edge in self.graph.successors(node_id):
                 relaxations += 1
                 if relaxations > budget:
@@ -731,10 +826,12 @@ class ImpactAnalyzer:
                     break
                 if edge.kind in _STORAGE_ONLY:
                     value = source_required
-                elif source_carried is not None:
-                    value = source_carried
+                elif edge.call_direction == "back":
+                    value = source_clean  # only what the callee itself put there
                 else:
-                    continue  # widened only by its copybook: no data to pass on
+                    value = source_carried
+                if value is None:
+                    continue  # no data here to pass on along this edge
                 target = self.graph.nodes.get(edge.target_id)
                 if target is None:
                     continue
@@ -752,6 +849,25 @@ class ImpactAnalyzer:
                     held = carried.get(edge.target_id)
                     if held is None or not held.covers(candidate):
                         carried[edge.target_id] = held.grown_to_hold(candidate) if held else candidate
+                        grew_carried = True
+                # The clean lane: everything except what a caller passes in.
+                clean_candidate: Optional[Capacity] = None
+                if edge.kind is EdgeKind.SHARED_DECLARATION or edge.call_direction == "into":
+                    pass
+                elif edge.kind in _LAYOUT or edge.call_direction == "back":
+                    clean_candidate = candidate
+                elif source_clean is not None:
+                    clean_candidate = (
+                        candidate
+                        if source_clean is source_carried
+                        else self._candidate(edge, node, source_clean, target, lane="clean")
+                    )
+                if clean_candidate is not None:
+                    held = clean.get(edge.target_id)
+                    if held is None or not held.covers(clean_candidate):
+                        clean[edge.target_id] = (
+                            held.grown_to_hold(clean_candidate) if held else clean_candidate
+                        )
                         grew_carried = True
                 previous = required.get(edge.target_id)
                 grew_required = previous is None or not previous.covers(candidate)
@@ -783,16 +899,80 @@ class ImpactAnalyzer:
         return required, self._reconstruct_paths(required, parents), arriving
 
     def _candidate(
-        self, edge: Edge, source: Node, source_required: Capacity, target: Node
+        self,
+        edge: Edge,
+        source: Node,
+        source_required: Capacity,
+        target: Node,
+        lane: str = "",
     ) -> Optional[Capacity]:
-        """What ``target`` must hold once ``source`` needs ``source_required``."""
+        """What ``target`` must hold once ``source`` needs ``source_required``.
+
+        ``lane`` keeps the running STRING totals for the clean lane apart from
+        the main one, so one cannot overwrite the other's contributions.
+        """
+        through = self._pass_through.get(
+            (edge.source_id, edge.target_id, edge.ref.path, edge.ref.line)
+        )
+        if through is not None:
+            return self._through_callee(through, source_required, target)
         if edge.kind is EdgeKind.STRING:
-            return self._string_requirement(edge, source, source_required, target)
+            return self._string_requirement(edge, source, source_required, target, lane)
         if edge.kind is EdgeKind.GROUP_PARENT:
             return self._group_requirement(edge, source, source_required, target)
         return _required_at_target(
             edge, source.capacity, source_required, target.capacity, self._delta_cap
         )
+
+    def _through_callee(
+        self, through: tuple[str, str, str], value: Capacity, target: Node
+    ) -> Optional[Capacity]:
+        """Run one caller's value through the callee, parameter to parameter.
+
+        What arrives at the outgoing LINKAGE item is what this caller's own
+        argument has to hold - the callee may STRING, UNSTRING or add to it on
+        the way, which a plain copy of the incoming width would miss. Only the
+        callee's own statements are followed, so no other caller's value can
+        get mixed in.
+        """
+        prefix, entry, exit_ = through
+        key = (entry, exit_)
+        if key in self._inside_callee:
+            return None  # a recursive CALL: nothing sound to add
+        self._inside_callee.add(key)
+        try:
+            lane = f"via:{entry}->{exit_}"
+            values = {entry: value}
+            stack = [entry]
+            steps = 0
+            while stack and steps < _PASS_THROUGH_STEPS:
+                node_id = stack.pop()
+                node = self.graph.nodes.get(node_id)
+                if node is None:
+                    continue
+                for edge in self.graph.successors(node_id):
+                    steps += 1
+                    if edge.call_direction or edge.kind is EdgeKind.SHARED_DECLARATION:
+                        continue
+                    if not edge.target_id.startswith(prefix):
+                        continue
+                    inner = self.graph.nodes.get(edge.target_id)
+                    if inner is None:
+                        continue
+                    candidate = self._candidate(edge, node, values[node_id], inner, lane)
+                    if candidate is None:
+                        continue
+                    held = values.get(edge.target_id)
+                    if held is not None and held.covers(candidate):
+                        continue
+                    values[edge.target_id] = held.grown_to_hold(candidate) if held else candidate
+                    stack.append(edge.target_id)
+            arrived = values.get(exit_)
+        finally:
+            self._inside_callee.discard(key)
+        if arrived is None:
+            return None
+        return target.capacity.grown_to_hold(arrived)
 
     def _in_cycle(self, edge: Edge) -> bool:
         component = self._component.get(edge.source_id)
@@ -807,7 +987,12 @@ class ImpactAnalyzer:
         return self._growth.get(key, 0)
 
     def _string_requirement(
-        self, edge: Edge, source: Node, source_required: Capacity, target: Node
+        self,
+        edge: Edge,
+        source: Node,
+        source_required: Capacity,
+        target: Node,
+        lane: str = "",
     ) -> Optional[Capacity]:
         """A STRING target holds the sum of its sources, plus its literals.
 
@@ -815,7 +1000,8 @@ class ImpactAnalyzer:
         room to spare (60 characters STRINGed into 70 needs nothing) and, when
         two sources both widened, kept only the larger increase.
         """
-        key = ("string", edge.target_id, edge.ref.path, str(edge.ref.line))
+        key = ("string" + lane, edge.target_id, edge.ref.path, str(edge.ref.line))
+        base_key = ("string", edge.target_id, edge.ref.path, str(edge.ref.line))
         before = _sliced_width(source.capacity, edge.source_slice)
         after = _sliced_width(source_required, edge.source_slice)
         if self._in_cycle(edge):
@@ -827,10 +1013,10 @@ class ImpactAnalyzer:
         growth = self._accumulate(key, edge.source_id, max(after - before, 0))
         if growth <= 0:
             return None
-        base = self._string_base.get(key)
+        base = self._string_base.get(base_key)
         if base is None:
             base = self._statement_width(edge)
-            self._string_base[key] = base
+            self._string_base[base_key] = base
         total = base + growth
         current = target.capacity
         if total <= current.chars:
@@ -1201,7 +1387,7 @@ class ImpactAnalyzer:
 
             for key in program.data.order:
                 item = program.data.fields[key]
-                node_id = self._field_nodes.get((program.name, item.name))
+                node_id = self._field_nodes.get((program.name, key))
                 finding = by_node.get(node_id) if node_id else None
                 if finding is None or not item.value:
                     continue
@@ -1239,7 +1425,7 @@ class ImpactAnalyzer:
                 item = program.data.fields[key]
                 if item.level == 88 or not item.source:
                     continue
-                node_id = self._field_nodes.get((program.name, item.name))
+                node_id = self._field_nodes.get((program.name, key))
                 node = self.graph.nodes.get(node_id) if node_id else None
                 need = required.get(node_id) if node_id else None
                 if node is None or need is None or node.capacity.covers(need):
@@ -1257,7 +1443,7 @@ class ImpactAnalyzer:
                 item = program.data.fields[key]
                 if item.level == 88:
                     continue
-                node_id = self._field_nodes.get((program.name, item.name))
+                node_id = self._field_nodes.get((program.name, key))
                 if node_id is None:
                     continue
                 node = self.graph.nodes.get(node_id)
@@ -1268,7 +1454,7 @@ class ImpactAnalyzer:
                 origin = item.source.path if item.source else ""
                 declared_here = not origin or Path(origin) == program_path
                 if declared_here:
-                    own_work[f"{item.name} must widen ({node.capacity.describe()} -> {need.describe()})"] = None
+                    own_work[f"{_display_name(program, key)} must widen ({node.capacity.describe()} -> {need.describe()})"] = None
 
             # A statement in this program that assumes the old width is an edit
             # here regardless of where the field itself is declared.
@@ -1280,7 +1466,7 @@ class ImpactAnalyzer:
                 need = required.get(node_id)
                 if node is None or need is None or node.capacity.covers(need):
                     continue
-                own_work[f"{usage.name} used via {usage.category}"] = None
+                own_work[f"{_display_name(program, usage.name)} used via {usage.category}"] = None
 
             included_and_changed = sorted(
                 {book for book in program.copybooks if Path(book) in changed_files}
@@ -1352,7 +1538,20 @@ class ImpactAnalyzer:
 
     # -- helpers ------------------------------------------------------------
 
-    def _variable_id(self, program: Program, item: Field) -> str:
+    def _host_variable_node(self, program: Program, host_var: str) -> Optional[str]:
+        """Node for ``:NAME`` or ``:RECORD.NAME``, the Pro*COBOL qualified form.
+
+        ``:CU02TB04.AT-REMN-DB`` is AT-REMN-DB OF CU02TB04. Looked up as one
+        literal name, it matched nothing, and the whole FETCH was dropped with
+        only a warning.
+        """
+        parts = [part for part in host_var.split(".") if part]
+        if not parts:
+            return None
+        key = program.data.resolve(parts[-1], list(reversed(parts[:-1])))
+        return self._field_nodes.get((program.name, key)) if key else None
+
+    def _variable_id(self, program: Program, item: Field, key: str = "") -> str:
         """One node per (program, field name).
 
         A field declared in a copybook used to get a single global node id
@@ -1370,6 +1569,11 @@ class ImpactAnalyzer:
         """
         if self.spec.global_variable_scope:
             return f"var:{item.name}"
+        # Two records in one program may both declare DT-DB. Each is its own
+        # field, and gets its own node, named the way the program must refer
+        # to it: DT-DB OF CU02TB04.
+        if key and len(program.data.keys_named(item.name)) > 1 and item.qualified:
+            return f"var:{program.name}::{item.qualified}"
         return f"var:{program.name}::{item.name}"
 
 
@@ -1423,6 +1627,25 @@ def _strongly_connected_components(graph: ImpactGraph) -> dict[str, int]:
                 parent = work[-1][0]
                 low[parent] = min(low[parent], low[node_id])
     return component
+
+
+def _redefined_key(program: Program, key: str, item: Field) -> str:
+    """The item ``item`` REDEFINES: the same-named one under the same parent."""
+    candidates = program.data.keys_named(item.redefines)
+    for candidate in candidates:
+        if candidate != key and program.data.fields[candidate].parent == item.parent:
+            return candidate
+    return candidates[0] if candidates else ""
+
+
+def _display_name(program: Program, key: str) -> str:
+    """How a maintainer names the field: qualified only when it has to be."""
+    item = program.data.fields.get(key)
+    if item is None:
+        return key
+    if len(program.data.keys_named(item.name)) > 1 and item.qualified:
+        return item.qualified
+    return item.name
 
 
 def _column_id(table: str, column: str) -> str:

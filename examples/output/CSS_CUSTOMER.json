@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-25 15:48:49Z",
+  "generated_at": "2026-09-25 18:48:53Z",
   "spec": {
     "changes": [
       {
@@ -37,7 +37,7 @@
   "summary": {
     "programs_scanned": 8,
     "nodes": 219,
-    "edges": 453,
+    "edges": 455,
     "findings": {
       "CRITICAL": 23,
       "HIGH": 11,
@@ -662,6 +662,40 @@
     {
       "severity": "CRITICAL",
       "category": "derived-variable",
+      "node": "var:CSFMTNAM::LK-DISPLAY-KEY",
+      "title": "LK-DISPLAY-KEY is too small for the widened value",
+      "detail": "Reached through a call-arg edge at examples/css/src/cscustinq.pco:60. Current PIC holds alphanumeric(40), but alphanumeric(81) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 LK-DISPLAY-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 LK-DISPLAY-KEY PIC X(81).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-CUST-NAME",
+        "var:CSCUSTINQ::CS-CUST-KEY",
+        "var:CSFMTNAM::LK-DISPLAY-KEY"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
+          "line": 60,
+          "program": "CSCUSTINQ",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "CALL 'CSFMTNAM' USING CS-CUST-NAME CS-CUST-KEY"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
+          "line": 16,
+          "program": "CSFMTNAM",
+          "paragraph": "",
+          "text": "01  LK-DISPLAY-KEY           PIC X(40)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
       "node": "var:CSFMTNAM::WS-WORK-NAME",
       "title": "WS-WORK-NAME is too small for the widened value",
       "detail": "Reached through a move edge at examples/css/src/csfmtnam.pco:19. Current PIC holds alphanumeric(30), but alphanumeric(40) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
@@ -908,42 +942,6 @@
       ]
     },
     {
-      "severity": "CRITICAL",
-      "category": "derived-variable",
-      "node": "var:CSFMTNAM::LK-DISPLAY-KEY",
-      "title": "LK-DISPLAY-KEY is too small for the widened value",
-      "detail": "Reached through a string edge at examples/css/src/csfmtnam.pco:25. Current PIC holds alphanumeric(40), but alphanumeric(81) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
-      "current": "01 LK-DISPLAY-KEY PIC X(40) DISPLAY",
-      "required": "alphanumeric(81)",
-      "remediation": "Change to: 01 LK-DISPLAY-KEY PIC X(81).",
-      "hops_from_change": 5,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSFMTNAM::LK-RAW-NAME",
-        "var:CSFMTNAM::WS-WORK-NAME",
-        "var:CSFMTNAM::WS-FIRST-NAME",
-        "var:CSFMTNAM::LK-DISPLAY-KEY"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
-          "line": 25,
-          "program": "CSFMTNAM",
-          "paragraph": "0000-MAIN",
-          "text": "STRING WS-FIRST-NAME DELIMITED BY SPACE ' '           DELIMITED BY SIZE WS-LAST-NAME  DELIMITED BY SPACE INTO LK-DISPLAY-KEY"
-        },
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
-          "line": 16,
-          "program": "CSFMTNAM",
-          "paragraph": "",
-          "text": "01  LK-DISPLAY-KEY           PIC X(40)"
-        }
-      ]
-    },
-    {
       "severity": "HIGH",
       "category": "host-variable",
       "node": "var:CSCUSTINQ::CS-SEARCH-NAME",
@@ -972,6 +970,39 @@
           "program": "CSCUSTINQ",
           "paragraph": "",
           "text": "01  CS-SEARCH-NAME           PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:CSCUSTINQ::CS-CUST-KEY",
+      "title": "CS-CUST-KEY is too small for the widened value",
+      "detail": "Reached through a call-arg edge at examples/css/src/cscustinq.pco:60. Current PIC holds alphanumeric(40), but alphanumeric(81) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
+      "hops_from_change": 2,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-CUST-NAME",
+        "var:CSCUSTINQ::CS-CUST-KEY"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
+          "line": 60,
+          "program": "CSCUSTINQ",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "CALL 'CSFMTNAM' USING CS-CUST-NAME CS-CUST-KEY"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 18,
+          "program": "CSCUSTINQ",
+          "paragraph": "",
+          "text": "01  CS-CUST-KEY              PIC X(40)"
         }
       ]
     },
@@ -1126,6 +1157,40 @@
     {
       "severity": "HIGH",
       "category": "derived-variable",
+      "node": "var:CSSVCORD::CS-SVC-TECH-NOTES",
+      "title": "CS-SVC-TECH-NOTES is too small for the widened value",
+      "detail": "Reached through a call-arg edge at examples/css/src/cssvcord.pco:45. Current PIC holds alphanumeric(60), but alphanumeric(66) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CS-SVC-TECH-NOTES PIC X(60) DISPLAY",
+      "required": "alphanumeric(66)",
+      "remediation": "Change to: 05 CS-SVC-TECH-NOTES PIC X(66).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSSVCORD::CS-CUST-NAME",
+        "var:CSSVCORD::CS-SVC-CUST-NAME",
+        "var:CSSVCORD::CS-SVC-TECH-NOTES"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
+          "line": 45,
+          "program": "CSSVCORD",
+          "paragraph": "2000-CREATE-ORDER",
+          "text": "CALL 'CSNOTES' USING CS-SVC-CUST-NAME CS-SVC-TECH-NOTES"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
+          "line": 11,
+          "program": "CSSVCORD",
+          "paragraph": "",
+          "text": "05  CS-SVC-TECH-NOTES    PIC X(60)"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
       "node": "var:CSBILLCYC::CS-RL-FLAT",
       "title": "CS-RL-FLAT is too small for the widened value",
       "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(100) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
@@ -1159,79 +1224,6 @@
           "program": "CSBILLCYC",
           "paragraph": "2000-PRINT-LINE",
           "text": "DISPLAY CS-RL-FLAT"
-        }
-      ]
-    },
-    {
-      "severity": "HIGH",
-      "category": "derived-variable",
-      "node": "var:CSSVCORD::CS-SVC-TECH-NOTES",
-      "title": "CS-SVC-TECH-NOTES is too small for the widened value",
-      "detail": "Reached through a call-arg edge at examples/css/src/cssvcord.pco:45. Current PIC holds alphanumeric(60), but alphanumeric(66) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
-      "current": "05 CS-SVC-TECH-NOTES PIC X(60) DISPLAY",
-      "required": "alphanumeric(66)",
-      "remediation": "Change to: 05 CS-SVC-TECH-NOTES PIC X(66).",
-      "hops_from_change": 5,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSSVCORD::CS-CUST-NAME",
-        "var:CSSVCORD::CS-SVC-CUST-NAME",
-        "var:CSNOTES::LK-CUST-NAME",
-        "var:CSNOTES::LK-TECH-NOTES",
-        "var:CSSVCORD::CS-SVC-TECH-NOTES"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
-          "line": 45,
-          "program": "CSSVCORD",
-          "paragraph": "2000-CREATE-ORDER",
-          "text": "CALL 'CSNOTES' USING CS-SVC-CUST-NAME CS-SVC-TECH-NOTES"
-        },
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
-          "line": 11,
-          "program": "CSSVCORD",
-          "paragraph": "",
-          "text": "05  CS-SVC-TECH-NOTES    PIC X(60)"
-        }
-      ]
-    },
-    {
-      "severity": "HIGH",
-      "category": "derived-variable",
-      "node": "var:CSCUSTINQ::CS-CUST-KEY",
-      "title": "CS-CUST-KEY is too small for the widened value",
-      "detail": "Reached through a call-arg edge at examples/css/src/cscustinq.pco:60. Current PIC holds alphanumeric(40), but alphanumeric(81) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
-      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
-      "required": "alphanumeric(81)",
-      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
-      "hops_from_change": 6,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSFMTNAM::LK-RAW-NAME",
-        "var:CSFMTNAM::WS-WORK-NAME",
-        "var:CSFMTNAM::WS-FIRST-NAME",
-        "var:CSFMTNAM::LK-DISPLAY-KEY",
-        "var:CSCUSTINQ::CS-CUST-KEY"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
-          "line": 60,
-          "program": "CSCUSTINQ",
-          "paragraph": "2000-FORMAT-LINE",
-          "text": "CALL 'CSFMTNAM' USING CS-CUST-NAME CS-CUST-KEY"
-        },
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
-          "line": 18,
-          "program": "CSCUSTINQ",
-          "paragraph": "",
-          "text": "01  CS-CUST-KEY              PIC X(40)"
         }
       ]
     },
@@ -1609,6 +1601,41 @@
     {
       "severity": "MEDIUM",
       "category": "record-layout",
+      "node": "var:CSSVCORD::CS-SVC-ORDER-REC",
+      "title": "CS-SVC-ORDER-REC: record length grows 109 -> 125 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "109 bytes",
+      "required": "125 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSSVCORD::CS-CUST-NAME",
+        "var:CSSVCORD::CS-SVC-CUST-NAME",
+        "var:CSSVCORD::CS-SVC-TECH-NOTES",
+        "var:CSSVCORD::CS-SVC-ORDER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
+          "line": 11,
+          "program": "CSSVCORD",
+          "paragraph": "",
+          "text": "05  CS-SVC-TECH-NOTES    PIC X(60)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
+          "line": 5,
+          "program": "CSSVCORD",
+          "paragraph": "",
+          "text": "01  CS-SVC-ORDER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
       "node": "var:CSCUSTINQ::CS-REPORT-LINE",
       "title": "CS-REPORT-LINE: record length grows 83 -> 100 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
@@ -1681,43 +1708,6 @@
           "program": "CSCUSTRPT",
           "paragraph": "",
           "text": "01  CS-REPORT-LINE"
-        }
-      ]
-    },
-    {
-      "severity": "MEDIUM",
-      "category": "record-layout",
-      "node": "var:CSSVCORD::CS-SVC-ORDER-REC",
-      "title": "CS-SVC-ORDER-REC: record length grows 109 -> 125 bytes",
-      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
-      "current": "109 bytes",
-      "required": "125 bytes",
-      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 6,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSSVCORD::CS-CUST-NAME",
-        "var:CSSVCORD::CS-SVC-CUST-NAME",
-        "var:CSNOTES::LK-CUST-NAME",
-        "var:CSNOTES::LK-TECH-NOTES",
-        "var:CSSVCORD::CS-SVC-TECH-NOTES",
-        "var:CSSVCORD::CS-SVC-ORDER-REC"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
-          "line": 11,
-          "program": "CSSVCORD",
-          "paragraph": "",
-          "text": "05  CS-SVC-TECH-NOTES    PIC X(60)"
-        },
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
-          "line": 5,
-          "program": "CSSVCORD",
-          "paragraph": "",
-          "text": "01  CS-SVC-ORDER-REC"
         }
       ]
     },
@@ -1913,6 +1903,62 @@
     {
       "severity": "LOW",
       "category": "copybook-field",
+      "node": "var:CSBILLCYC::CS-CUST-KEY",
+      "title": "CS-CUST-KEY widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(81). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-CUST-NAME",
+        "var:CSCUSTINQ::CS-CUST-KEY",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:18:CS-CUST-KEY",
+        "var:CSBILLCYC::CS-CUST-KEY"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 18,
+          "program": "CSBILLCYC",
+          "paragraph": "",
+          "text": "01  CS-CUST-KEY              PIC X(40)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-CUST-KEY",
+      "title": "CS-CUST-KEY widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(81). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-CUST-NAME",
+        "var:CSCUSTINQ::CS-CUST-KEY",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:18:CS-CUST-KEY",
+        "var:CSCUSTRPT::CS-CUST-KEY"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 18,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "01  CS-CUST-KEY              PIC X(40)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
       "node": "var:CSCUSTRPT::CS-RL-NAME",
       "title": "CS-RL-NAME widens with CSWORK.cpy",
       "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(40). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
@@ -1964,70 +2010,6 @@
           "program": "CSCUSTRPT",
           "paragraph": "",
           "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
-        }
-      ]
-    },
-    {
-      "severity": "LOW",
-      "category": "copybook-field",
-      "node": "var:CSBILLCYC::CS-CUST-KEY",
-      "title": "CS-CUST-KEY widens with CSWORK.cpy",
-      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(81). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
-      "notes": [],
-      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
-      "required": "alphanumeric(81)",
-      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
-      "hops_from_change": 8,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSFMTNAM::LK-RAW-NAME",
-        "var:CSFMTNAM::WS-WORK-NAME",
-        "var:CSFMTNAM::WS-FIRST-NAME",
-        "var:CSFMTNAM::LK-DISPLAY-KEY",
-        "var:CSCUSTINQ::CS-CUST-KEY",
-        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:18:CS-CUST-KEY",
-        "var:CSBILLCYC::CS-CUST-KEY"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
-          "line": 18,
-          "program": "CSBILLCYC",
-          "paragraph": "",
-          "text": "01  CS-CUST-KEY              PIC X(40)"
-        }
-      ]
-    },
-    {
-      "severity": "LOW",
-      "category": "copybook-field",
-      "node": "var:CSCUSTRPT::CS-CUST-KEY",
-      "title": "CS-CUST-KEY widens with CSWORK.cpy",
-      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(81). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
-      "notes": [],
-      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
-      "required": "alphanumeric(81)",
-      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
-      "hops_from_change": 8,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSFMTNAM::LK-RAW-NAME",
-        "var:CSFMTNAM::WS-WORK-NAME",
-        "var:CSFMTNAM::WS-FIRST-NAME",
-        "var:CSFMTNAM::LK-DISPLAY-KEY",
-        "var:CSCUSTINQ::CS-CUST-KEY",
-        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:18:CS-CUST-KEY",
-        "var:CSCUSTRPT::CS-CUST-KEY"
-      ],
-      "references": [
-        {
-          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
-          "line": 18,
-          "program": "CSCUSTRPT",
-          "paragraph": "",
-          "text": "01  CS-CUST-KEY              PIC X(40)"
         }
       ]
     },

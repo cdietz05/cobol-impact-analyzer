@@ -27,8 +27,13 @@ from .sqlparse import SqlAnalyzer, SqlStatement
 
 _NAME = r"[A-Za-z][A-Za-z0-9_\-#@$]*"
 _NAME_RE = re.compile(_NAME)
-_REFMOD_RE = re.compile(rf"({_NAME})\s*\((?P<args>[^()]*:[^()]*)\)")
+# A data reference, possibly qualified: CD-BUS OF CU02TB04, X IN Y OF Z.
+_QUALIFIED_REF = rf"{_NAME}(?:\s+(?:OF|IN)\s+{_NAME})*"
+_QUALIFIED_REF_RE = re.compile(_QUALIFIED_REF, re.I)
+_QUALIFIER_SPLIT_RE = re.compile(r"\s+(?:OF|IN)\s+", re.I)
+_REFMOD_RE = re.compile(rf"({_QUALIFIED_REF})\s*\((?P<args>[^()]*:[^()]*)\)", re.I)
 
+_DECLARE_CURSOR_RE = re.compile(r"\s*DECLARE\s+[A-Za-z][A-Za-z0-9_$#]*\s+CURSOR\b", re.I)
 _PROGRAM_ID_RE = re.compile(r"PROGRAM-ID\s*\.?\s*([A-Za-z0-9][A-Za-z0-9_\-#@$]*)", re.I)
 _EXEC_SQL_START_RE = re.compile(r"(?<![A-Za-z0-9_\-#@$])EXEC\s+SQL(?![A-Za-z0-9_\-#@$])", re.I)
 _EXEC_SQL_END_RE = re.compile(r"(?<![A-Za-z0-9_\-#@$])END-EXEC(?![A-Za-z0-9_\-#@$])", re.I)
@@ -166,6 +171,16 @@ class ProgramParser:
         program.warnings.extend(card_warnings)
 
         sql_blocks, stripped = _extract_exec_sql(lines)
+        # Register every cursor this program declares before reading any FETCH
+        # or OPEN. Programs routinely keep the DECLAREs in a paragraph at the
+        # bottom, after the FETCH that uses them; read top to bottom, that FETCH
+        # found no cursor of its own and borrowed the select list of a
+        # same-named C1 from another program - pairing every column with the
+        # wrong host variable.
+        for text, ref in sql_blocks:
+            if _DECLARE_CURSOR_RE.match(text):
+                ref.program = name
+                self.sql_analyzer.parse(text, ref)
         for text, ref in sql_blocks:
             ref.program = name
             statement = self.sql_analyzer.parse(text, ref)
@@ -414,6 +429,9 @@ def _line_for_offset(sentence: cobolsrc.Sentence, offset: int) -> int:
     return sentence.line_no
 
 
+_VERB_WORDS = frozenset(verb.upper() for verb in _VERBS)
+
+
 def identifiers(text: str) -> list[str]:
     """Data-name-looking tokens, with literals, numbers and keywords removed."""
     without_literals = re.sub(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"", " ", text)
@@ -462,16 +480,42 @@ def strip_subscripts(text: str) -> str:
 
 
 def known_identifiers(program: Program, text: str) -> list[str]:
-    """Identifiers that actually resolve to a declared data item."""
+    """Data items referenced in ``text``, as keys of ``program.data``.
+
+    ``CD-BUS OF CU02TB04`` is ONE reference, to the CD-BUS inside CU02TB04.
+    Reading it word by word made the record CU02TB04 a second operand of every
+    qualified statement - IF DT-DB OF CU02TB04 > WS-DATE compared the whole
+    record with WS-DATE - and resolved every duplicated name to whichever
+    record declared it first.
+    """
     seen: set[str] = set()
     result: list[str] = []
-    for name in identifiers(strip_subscripts(text)):
-        if name in seen:
-            continue
-        seen.add(name)
-        if program.data.get(name) is not None:
-            result.append(name)
+    for key in _references(program, text):
+        if key not in seen:
+            seen.add(key)
+            result.append(key)
     return result
+
+
+def _references(program: Program, text: str) -> list[str]:
+    """Every data reference in ``text``, resolved and in order, repeats kept."""
+    without_literals = re.sub(r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"", " ", text or "")
+    found: list[str] = []
+    for match in _QUALIFIED_REF_RE.finditer(strip_subscripts(without_literals)):
+        key = _resolve_reference(program, match.group(0))
+        if key is not None:
+            found.append(key)
+    return found
+
+
+def _resolve_reference(program: Program, reference: str) -> Optional[str]:
+    """``NAME OF A OF B`` to a data key, or None for keywords and unknowns."""
+    parts = [part.upper() for part in _QUALIFIER_SPLIT_RE.split(reference.strip())]
+    name = parts[0]
+    # LENGTH OF X and ADDRESS OF X are a length and a pointer, not X's value.
+    if name in _RESERVED or name in _VERB_WORDS or name.isdigit():
+        return None
+    return program.data.resolve(name, parts[1:])
 
 
 def _split_on_keyword(text: str, keyword: str) -> tuple[str, str]:
@@ -532,8 +576,8 @@ def _handle_move(program: Program, chunk: str, ref: SourceRef) -> None:
         if literal:
             for target in targets:
                 _remember_literal(program, target, literal)
-    source_slices = _slices(source_text)
-    target_slices = _slices(target_text)
+    source_slices = _slices(program, source_text)
+    target_slices = _slices(program, target_text)
     for target in targets:
         program.flows.append(
             Flow(
@@ -559,9 +603,9 @@ def _move_corresponding(
     """MOVE CORRESPONDING pairs children by unqualified name."""
     if not sources:
         return
-    source_group = program.data.get(sources[0])
-    for target_name in targets:
-        target_group = program.data.get(target_name)
+    source_group = program.data.fields.get(sources[0])
+    for target_key in targets:
+        target_group = program.data.fields.get(target_key)
         if source_group is None or target_group is None:
             continue
         source_children = {
@@ -574,8 +618,8 @@ def _move_corresponding(
                 continue
             program.flows.append(
                 Flow(
-                    sources=[program.data.fields[match].name],
-                    target=child.name,
+                    sources=[match],
+                    target=key,
                     kind=EdgeKind.MOVE,
                     ref=ref,
                     note="MOVE CORRESPONDING",
@@ -593,7 +637,7 @@ def _handle_string(program: Program, chunk: str, ref: SourceRef) -> None:
         r"(?<![A-Za-z0-9_\-#@$])DELIMITED\s+BY\s+(SIZE|[^\s]+)", " ", source_text, flags=re.I
     )
     sources = known_identifiers(program, concatenated)
-    source_slices = _slices(concatenated)
+    source_slices = _slices(program, concatenated)
     literal_chars = sum(len(literal) for literal in _quoted_literals(concatenated))
     target_text, _ = _split_on_keyword(target_text, "WITH")
     targets = known_identifiers(program, target_text)
@@ -756,9 +800,7 @@ def _call_arguments(program: Program, using_text: str) -> list[str]:
         upper = token.upper()
         following = tokens[index + 1].upper() if index + 1 < len(tokens) else ""
         index += 1
-        if upper in ("OF", "IN"):
-            index += 1  # A OF B names A; B only qualifies it
-        elif upper in ("ADDRESS", "LENGTH") and following == "OF":
+        if upper in ("ADDRESS", "LENGTH") and following == "OF":
             args.append("")  # a pointer or a length, not the item itself
             index += 2
         elif token[0] in "'\"+-" or token[0].isdigit() or upper in _FIGURATIVE:
@@ -766,7 +808,16 @@ def _call_arguments(program: Program, using_text: str) -> list[str]:
         elif upper in _ARGUMENT_NOISE or upper in _RESERVED:
             continue
         else:
-            args.append(upper if program.data.get(upper) is not None else "")
+            # A OF B OF C is one argument, the A inside B inside C.
+            qualifiers: list[str] = []
+            while (
+                index + 1 < len(tokens)
+                and tokens[index].upper() in ("OF", "IN")
+            ):
+                qualifiers.append(tokens[index + 1].upper())
+                index += 2
+            key = program.data.resolve(upper, qualifiers)
+            args.append(key or "")
     return args
 
 
@@ -809,10 +860,10 @@ def _handle_initialize(program: Program, chunk: str, ref: SourceRef) -> None:
 
 
 _RELATION_RE = re.compile(
-    r"(?P<left>'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9_\-#@$]*(?:\s*\([^)]*\))?)\s*"
+    rf"(?P<left>'(?:[^']|'')*'|{_QUALIFIED_REF}(?:\s*\([^)]*\))?)\s*"
     r"(?P<op>=|<>|>=|<=|>|<|(?:IS\s+)?(?:NOT\s+)?(?:GREATER|LESS|EQUAL)(?:\s+THAN)?"
     r"(?:\s+OR\s+EQUAL(?:\s+TO)?)?)\s*"
-    r"(?P<right>'(?:[^']|'')*'|[A-Za-z][A-Za-z0-9_\-#@$]*(?:\s*\([^)]*\))?)",
+    rf"(?P<right>'(?:[^']|'')*'|{_QUALIFIED_REF}(?:\s*\([^)]*\))?)",
     re.I,
 )
 
@@ -905,14 +956,17 @@ _HANDLERS = {
 }
 
 
-def _slices(text: str) -> dict[str, Slice]:
-    """Reference-modification ranges in ``text``, by the name they modify."""
+def _slices(program: Program, text: str) -> dict[str, Slice]:
+    """Reference-modification ranges in ``text``, by the data key they modify."""
     found: dict[str, Slice] = {}
     for match in _REFMOD_RE.finditer(text or ""):
+        key = _resolve_reference(program, match.group(1))
+        if key is None:
+            continue
         offset_text, _, length_text = match.group("args").partition(":")
         offset_text, length_text = offset_text.strip(), length_text.strip()
         found.setdefault(
-            match.group(1).upper(),
+            key,
             Slice(
                 offset=int(offset_text) if offset_text.isdigit() else None,
                 length=int(length_text) if length_text.isdigit() else None,
@@ -932,8 +986,8 @@ def _quoted_literals(text: str) -> list[str]:
 def _record_refmods(program: Program, chunk: str, ref: SourceRef) -> None:
     """Flag reference modification, which pins offsets that a widening breaks."""
     for match in _REFMOD_RE.finditer(chunk):
-        name = match.group(1).upper()
-        if program.data.get(name) is None:
+        name = _resolve_reference(program, match.group(1))
+        if name is None:
             continue
         program.usages.append(
             Usage(
