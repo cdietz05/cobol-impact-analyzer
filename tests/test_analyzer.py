@@ -670,6 +670,92 @@ class CopybookFieldTests(unittest.TestCase):
         self.assertIs(finding.severity, Severity.CRITICAL)
 
 
+_LEAK_COPYBOOK = """\
+       01  CUST-REC.
+           05  CUST-NAME            PIC X(30).
+           05  CUST-CITY            PIC X(20).
+           05  CUST-BAL             PIC S9(7)V99.
+"""
+
+_LEAK_WIDENER = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. WIDENER.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CUSTREC END-EXEC.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT CUST_NAME INTO :CUST-NAME FROM CUSTOMER WHERE ID = 1
+           END-EXEC
+           MOVE CUST-NAME TO CUST-CITY
+           GOBACK.
+"""
+
+_LEAK_BYSTANDER = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. BYSTAND.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           EXEC SQL INCLUDE CUSTREC END-EXEC.
+       01  WS-CITY-OUT              PIC X(20).
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT CUST_BAL INTO :CUST-BAL FROM CUSTOMER WHERE ID = 1
+           END-EXEC
+           MOVE CUST-BAL TO CUST-CITY
+           MOVE CUST-CITY TO WS-CITY-OUT
+           GOBACK.
+"""
+
+
+class CopybookSizeDoesNotFlowTests(unittest.TestCase):
+    """A copybook field's new size is not data moving through other programs.
+
+    WIDENER moves the widened name into CUST-CITY, so CUSTREC.cpy's CUST-CITY
+    has to grow. BYSTAND only ever puts a balance in CUST-CITY. Its copy of
+    the field grows with the copybook, but moving it on moves a balance, and
+    must not flag WS-CITY-OUT as needing room for a 60-character name.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        root = Path(cls._tmp.name)
+        (root / "cpy").mkdir()
+        (root / "src").mkdir()
+        (root / "cpy" / "CUSTREC.cpy").write_text(_LEAK_COPYBOOK)
+        (root / "src" / "widener.pco").write_text(_LEAK_WIDENER)
+        (root / "src" / "bystand.pco").write_text(_LEAK_BYSTANDER)
+        cls.result = analyze(
+            ChangeSpec(
+                changes=[
+                    build_change("CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)"),
+                    build_change("CUSTOMER", "CUST_BAL", "NUMBER(9,2)", "NUMBER(11,2)"),
+                ],
+                source_paths=[root / "src"],
+                copybook_paths=[root / "cpy"],
+                source_patterns=["*.pco"],
+            )
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_the_program_that_moves_the_name_in_is_flagged(self):
+        [finding] = _find(self.result, "var:WIDENER::CUST-CITY")
+        self.assertIs(finding.severity, Severity.CRITICAL)
+
+    def test_the_copybook_size_does_not_travel_through_another_programs_move(self):
+        self.assertFalse(_find(self.result, "var:BYSTAND::WS-CITY-OUT"))
+
+    def test_the_other_programs_copy_is_a_rebuild(self):
+        [finding] = _find(self.result, "var:BYSTAND::CUST-CITY")
+        self.assertEqual(finding.category, "copybook-field")
+
+
 class ReferenceModificationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

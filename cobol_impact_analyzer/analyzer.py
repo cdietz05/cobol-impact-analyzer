@@ -49,8 +49,10 @@ _COMBINING = frozenset({EdgeKind.COMPUTE, EdgeKind.ARITHMETIC})
 # Edges where growing the source forces the destination to grow in lockstep
 # because they share physical storage.
 _LAYOUT = frozenset({EdgeKind.GROUP_PARENT, EdgeKind.REDEFINES})
-# Edges a field reached only through its copybook still follows: its storage
-# changes, but no widened data arrives in it.
+# Edges that pass on a field's declared size rather than the data in it. A
+# copybook link changes the declaration everywhere, and a group or REDEFINES is
+# physically as long as its storage. Every other edge passes on only the data
+# the program actually puts there - see ``carried`` in _propagate.
 _STORAGE_ONLY = _LAYOUT | {EdgeKind.SHARED_DECLARATION}
 
 # The propagation guard: at most this many edge relaxations per run, or this
@@ -639,13 +641,20 @@ class ImpactAnalyzer:
         # the hub's entire fan-out again. Deduping loses nothing, because a
         # pop always reads the latest merged requirement.
         queued: set[str] = set()
-        # A copybook field can widen for two reasons: widened data reaches it,
-        # or another program's need for it edits the copybook. Only the first
-        # carries the wider value on through this program's MOVEs and STRINGs.
-        # A field reached only through its copybook follows storage edges
-        # alone - its record grows, but nothing in this program fills it with
-        # more data than before.
-        flow_reached: set[str] = set()
+        # Two requirements per node, because a copybook field can widen for two
+        # different reasons. ``required`` is the size its declaration must
+        # become - raised by widened data arriving, or by another program's
+        # need for the same copybook field. ``carried`` is only the first: how
+        # wide the data is that this program's own statements put there. Only
+        # ``carried`` travels on through MOVE, STRING, CALL and SQL. Letting the
+        # copybook's size travel too made one program's MOVE CUST-NAME TO
+        # CUST-CITY flag every other program's MOVE CUST-CITY TO WS-CITY, where
+        # CUST-CITY never held a name at all.
+        #
+        # Layout edges (group membership, REDEFINES) are the exception: a
+        # longer record really is longer, and moving it moves every byte, so
+        # they carry the storage size.
+        carried: dict[str, Capacity] = {}
         truncated: set[str] = set()
         # STRING targets and group items are sized by adding up what every
         # source brought, not by the largest single one. Kept as a running
@@ -668,10 +677,10 @@ class ImpactAnalyzer:
         for change in self.spec.changes:
             node_id = _column_id(change.table, change.column)
             required[node_id] = change.new_capacity
+            carried[node_id] = change.new_capacity
             depth[node_id] = 0
             queue.append(node_id)
             queued.add(node_id)
-            flow_reached.add(node_id)
 
         limit = self.spec.max_depth or 0
         total_edges = sum(len(edges) for edges in self.graph.out_edges.values())
@@ -708,7 +717,7 @@ class ImpactAnalyzer:
             if limit and current_depth >= limit:
                 continue
             source_required = required[node_id]
-            flowing = node_id in flow_reached
+            source_carried = carried.get(node_id)
             for edge in self.graph.successors(node_id):
                 relaxations += 1
                 if relaxations > budget:
@@ -720,8 +729,12 @@ class ImpactAnalyzer:
                     self.progress.warn(message)
                     exhausted = True
                     break
-                if not flowing and edge.kind not in _STORAGE_ONLY:
-                    continue
+                if edge.kind in _STORAGE_ONLY:
+                    value = source_required
+                elif source_carried is not None:
+                    value = source_carried
+                else:
+                    continue  # widened only by its copybook: no data to pass on
                 target = self.graph.nodes.get(edge.target_id)
                 if target is None:
                     continue
@@ -729,37 +742,43 @@ class ImpactAnalyzer:
                 # back an already-grown requirement would add the delta again on
                 # every pass around a cycle (REDEFINES and CALL argument edges
                 # are bidirectional) and never converge.
-                candidate = self._candidate(edge, node, source_required, target)
+                candidate = self._candidate(edge, node, value, target)
                 if candidate is None:
                     continue
-                # Layout edges always carry: a longer record really is longer,
-                # and moving it moves every byte.
-                carries = edge.kind in _LAYOUT or (
-                    flowing and edge.kind is not EdgeKind.SHARED_DECLARATION
-                )
-                newly_reached = carries and edge.target_id not in flow_reached
                 if edge.kind.truncates and not target.capacity.covers(candidate):
                     truncated.add(edge.target_id)
-                if newly_reached:
-                    flow_reached.add(edge.target_id)
+                grew_carried = False
+                if edge.kind is not EdgeKind.SHARED_DECLARATION:
+                    held = carried.get(edge.target_id)
+                    if held is None or not held.covers(candidate):
+                        carried[edge.target_id] = held.grown_to_hold(candidate) if held else candidate
+                        grew_carried = True
                 previous = required.get(edge.target_id)
-                if previous is not None and previous.covers(candidate):
-                    if not newly_reached:
-                        continue
-                    # No wider, but now carrying data: walk its flows too.
-                else:
-                    merged = previous.grown_to_hold(candidate) if previous else candidate
-                    required[edge.target_id] = merged
+                grew_required = previous is None or not previous.covers(candidate)
+                if grew_required:
+                    required[edge.target_id] = (
+                        previous.grown_to_hold(candidate) if previous else candidate
+                    )
                     parents[edge.target_id] = node_id
                     depth[edge.target_id] = current_depth + 1
                     arriving[edge.target_id] = edge
+                elif not grew_carried:
+                    continue
+                depth.setdefault(edge.target_id, current_depth + 1)
                 if edge.target_id not in queued:
                     queue.append(edge.target_id)
                     queued.add(edge.target_id)
 
         self.progress.step(processed, processed, f"{len(required)} node(s) affected")
         self._depth = depth
-        self._flow_reached = flow_reached
+        # Widened data actually reaches these: what arrives through this
+        # program's own statements does not fit the field as declared.
+        self._flow_reached = {
+            node_id
+            for node_id, value in carried.items()
+            if node_id in self.graph.nodes
+            and not self.graph.nodes[node_id].capacity.covers(value)
+        }
         self._truncated = truncated
         return required, self._reconstruct_paths(required, parents), arriving
 
