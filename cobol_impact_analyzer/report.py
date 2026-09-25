@@ -64,8 +64,9 @@ _SEVERITY_BLURB = {
         "at all."
     ),
     Severity.LOW: (
-        "Cosmetic or informational. DISPLAY alignment, INITIALIZE, SET — "
-        "check it, nothing breaks on its own."
+        "Cosmetic or informational. DISPLAY alignment, INITIALIZE, SET, or a "
+        "copybook field that widens with its copybook — check it, nothing "
+        "breaks on its own."
     ),
     Severity.INFO: "The change you asked for, echoed back with its DDL. The root of every trace.",
 }
@@ -99,6 +100,8 @@ _SEVERITY_DETAIL = {
     Severity.LOW: [
         "DISPLAY output or log alignment shifts.",
         "INITIALIZE or SET on the field — confirm the value still fits.",
+        "A copybook field that widens only because another program needs it "
+        "wider — rebuild against the edited copybook, nothing to edit here.",
     ],
     Severity.INFO: [
         "The requested column change and its ALTER statement.",
@@ -197,6 +200,8 @@ def write_csv(result: AnalysisResult, path: Path) -> None:
 
 def _plain_name(node_id: str) -> str:
     """``var:PROG::WS-FOO`` -> ``WS-FOO``; ``col:CUSTOMER.CUST_NAME`` -> that."""
+    if node_id.startswith("decl:"):
+        return _declaration_label(node_id)
     body = node_id.split(":", 1)[1] if ":" in node_id else node_id
     return body.split("::", 1)[1] if "::" in body else body
 
@@ -251,7 +256,20 @@ def _pretty_path(path: Iterable[str]) -> list[str]:
 def _strip_prefix(node_id: str) -> str:
     if node_id.startswith(("col:", "var:")):
         return node_id[4:]
+    if node_id.startswith("decl:"):
+        return _declaration_label(node_id)
     return node_id
+
+
+def _declaration_label(node_id: str) -> str:
+    """``decl:<copybook path>:<line>:<name>`` -> ``CUSTOMER.cpy:6``.
+
+    The node joining every program's copy of one copybook declaration. The
+    copybook line is what a maintainer recognises; the full path is noise.
+    """
+    location, _, _ = node_id[len("decl:"):].rpartition(":")
+    book, _, line = location.rpartition(":")
+    return f"{_short_path(book)}:{line}"
 
 
 def _seed_change(result: AnalysisResult, plain: str):

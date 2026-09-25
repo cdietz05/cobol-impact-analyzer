@@ -35,6 +35,7 @@ from .models import (
     Node,
     NodeKind,
     Severity,
+    Slice,
     SourceRef,
 )
 from .pco import CallSite, Flow, Program, ProgramParser, Usage, discover_sources
@@ -42,12 +43,15 @@ from .spec import ChangeSpec
 from .sqlparse import Direction, SqlStatement
 
 # Edges where the destination accumulates rather than simply receiving a value.
-_COMBINING = frozenset(
-    {EdgeKind.STRING, EdgeKind.COMPUTE, EdgeKind.ARITHMETIC}
-)
+# STRING and GROUP_PARENT also combine, but they are summed over every source
+# in _propagate rather than grown one edge at a time.
+_COMBINING = frozenset({EdgeKind.COMPUTE, EdgeKind.ARITHMETIC})
 # Edges where growing the source forces the destination to grow in lockstep
 # because they share physical storage.
 _LAYOUT = frozenset({EdgeKind.GROUP_PARENT, EdgeKind.REDEFINES})
+# Edges a field reached only through its copybook still follows: its storage
+# changes, but no widened data arrives in it.
+_STORAGE_ONLY = _LAYOUT | {EdgeKind.SHARED_DECLARATION}
 
 # The propagation guard: at most this many edge relaxations per run, or this
 # multiple of the edge count, whichever is larger. Both are named constants so a
@@ -221,6 +225,15 @@ class ImpactAnalyzer:
         self._depth: dict[str, int] = {}
         # Columns whose current width was guessed from a bound host variable.
         self._inferred_columns: set[str] = set()
+        # Nodes that widened data actually reaches. A copybook field widened only
+        # because another program needs it wider is not in here - see
+        # _propagate.
+        self._flow_reached: set[str] = set()
+        # Nodes some truncating edge (MOVE, fetch, STRING...) delivered more to
+        # than they can hold. Severity comes from this, not from whichever edge
+        # happened to grow the node last - a copybook or CALL link arriving
+        # after a truncating MOVE must not downgrade it.
+        self._truncated: set[str] = set()
 
     # -- entry point ------------------------------------------------------
 
@@ -318,6 +331,7 @@ class ImpactAnalyzer:
             self._add_flow_edges(program)
             self._add_layout_edges(program)
         self._add_call_edges()
+        self._add_shared_declarations()
 
     def _add_program_nodes(self, program: Program) -> None:
         for key in program.data.order:
@@ -418,7 +432,18 @@ class ImpactAnalyzer:
                 source_id = self._field_nodes.get((program.name, source))
                 if source_id is None:
                     continue
-                self.graph.add_edge(Edge(source_id, target_id, flow.kind, ref, flow.note))
+                self.graph.add_edge(
+                    Edge(
+                        source_id,
+                        target_id,
+                        flow.kind,
+                        ref,
+                        flow.note,
+                        source_slice=flow.source_slices.get(source),
+                        target_slice=flow.target_slice,
+                        extra_chars=flow.literal_chars,
+                    )
+                )
 
     def _add_layout_edges(self, program: Program) -> None:
         """Group membership and REDEFINES: storage that moves together."""
@@ -481,6 +506,67 @@ class ImpactAnalyzer:
                         self.graph.add_edge(
                             Edge(callee_id, caller_id, EdgeKind.CALL_ARG, call.ref, note)
                         )
+
+    def _add_shared_declarations(self) -> None:
+        """Join every program's copy of one copybook declaration.
+
+        Each program gets its own node for a copybook field, because the
+        storage is not shared at run time. The source is: the moment one
+        program needs CUST-NAME wider, CUSTOMER.cpy is edited, and every
+        program that includes it gets the wider field and the longer record.
+        Without this, one copybook was reported with a different record length
+        in every program, each counting only the columns that program touched.
+
+        The programs are joined through one declaration node rather than
+        pairwise, so a copybook included by hundreds of programs adds edges in
+        proportion to its includers, not to their square.
+        """
+        copies: dict[tuple[str, int, int, str, str, int], list[tuple[str, Field]]] = {}
+        for program in self.programs:
+            program_path = Path(program.path)
+            for key in program.data.order:
+                item = program.data.fields[key]
+                if item.level == 88 or item.source is None:
+                    continue
+                if Path(item.source.path) == program_path:
+                    continue  # declared inline, not in a copybook
+                node_id = self._field_nodes.get((program.name, item.name))
+                if node_id is None:
+                    continue
+                # Name is left out on purpose: COPY REPLACING gives the same
+                # declaration a different name in each program.
+                declaration = (
+                    item.source.path,
+                    item.source.line,
+                    item.level,
+                    item.picture,
+                    item.usage,
+                    item.occurs,
+                )
+                copies.setdefault(declaration, []).append((node_id, item))
+
+        for declaration, members in copies.items():
+            node_ids = list(dict.fromkeys(node_id for node_id, _ in members))
+            if len(node_ids) < 2:
+                continue
+            path, line = declaration[0], declaration[1]
+            item = members[0][1]
+            hub_id = f"decl:{path}:{line}:{item.name}"
+            self.graph.add_node(
+                Node(
+                    node_id=hub_id,
+                    kind=NodeKind.DECLARATION,
+                    name=f"{Path(path).name}:{line}",
+                    capacity=_effective_capacity(item),
+                    declared_in=item.source,
+                    field_ref=item,
+                )
+            )
+            ref = item.source or SourceRef(path=path, line=line)
+            for node_id in node_ids:
+                note = "same copybook declaration"
+                self.graph.add_edge(Edge(node_id, hub_id, EdgeKind.SHARED_DECLARATION, ref, note))
+                self.graph.add_edge(Edge(hub_id, node_id, EdgeKind.SHARED_DECLARATION, ref, note))
 
     def _call_targets(
         self, program: Program, call: CallSite, by_name: dict[str, Program]
@@ -553,6 +639,20 @@ class ImpactAnalyzer:
         # the hub's entire fan-out again. Deduping loses nothing, because a
         # pop always reads the latest merged requirement.
         queued: set[str] = set()
+        # A copybook field can widen for two reasons: widened data reaches it,
+        # or another program's need for it edits the copybook. Only the first
+        # carries the wider value on through this program's MOVEs and STRINGs.
+        # A field reached only through its copybook follows storage edges
+        # alone - its record grows, but nothing in this program fills it with
+        # more data than before.
+        flow_reached: set[str] = set()
+        truncated: set[str] = set()
+        # STRING targets and group items are sized by adding up what every
+        # source brought, not by the largest single one. Kept as a running
+        # total so a hub with thousands of members costs O(1) per update.
+        self._growth: dict[tuple[str, ...], int] = {}
+        self._contribution: dict[tuple[tuple[str, ...], str], int] = {}
+        self._string_base: dict[tuple[str, ...], int] = {}
 
         for change in self.spec.changes:
             node_id = _column_id(change.table, change.column)
@@ -560,6 +660,7 @@ class ImpactAnalyzer:
             depth[node_id] = 0
             queue.append(node_id)
             queued.add(node_id)
+            flow_reached.add(node_id)
 
         limit = self.spec.max_depth or 0
         total_edges = sum(len(edges) for edges in self.graph.out_edges.values())
@@ -595,8 +696,8 @@ class ImpactAnalyzer:
             current_depth = depth.get(node_id, 0)
             if limit and current_depth >= limit:
                 continue
-            source_current = node.capacity
             source_required = required[node_id]
+            flowing = node_id in flow_reached
             for edge in self.graph.successors(node_id):
                 relaxations += 1
                 if relaxations > budget:
@@ -608,6 +709,8 @@ class ImpactAnalyzer:
                     self.progress.warn(message)
                     exhausted = True
                     break
+                if not flowing and edge.kind not in _STORAGE_ONLY:
+                    continue
                 target = self.graph.nodes.get(edge.target_id)
                 if target is None:
                     continue
@@ -615,26 +718,121 @@ class ImpactAnalyzer:
                 # back an already-grown requirement would add the delta again on
                 # every pass around a cycle (REDEFINES and CALL argument edges
                 # are bidirectional) and never converge.
-                candidate = _required_at_target(
-                    edge, source_current, source_required, target.capacity
-                )
+                candidate = self._candidate(edge, node, source_required, target)
                 if candidate is None:
                     continue
+                # Layout edges always carry: a longer record really is longer,
+                # and moving it moves every byte.
+                carries = edge.kind in _LAYOUT or (
+                    flowing and edge.kind is not EdgeKind.SHARED_DECLARATION
+                )
+                newly_reached = carries and edge.target_id not in flow_reached
+                if edge.kind.truncates and not target.capacity.covers(candidate):
+                    truncated.add(edge.target_id)
+                if newly_reached:
+                    flow_reached.add(edge.target_id)
                 previous = required.get(edge.target_id)
                 if previous is not None and previous.covers(candidate):
-                    continue
-                merged = previous.grown_to_hold(candidate) if previous else candidate
-                required[edge.target_id] = merged
-                parents[edge.target_id] = node_id
-                depth[edge.target_id] = current_depth + 1
-                arriving[edge.target_id] = edge
+                    if not newly_reached:
+                        continue
+                    # No wider, but now carrying data: walk its flows too.
+                else:
+                    merged = previous.grown_to_hold(candidate) if previous else candidate
+                    required[edge.target_id] = merged
+                    parents[edge.target_id] = node_id
+                    depth[edge.target_id] = current_depth + 1
+                    arriving[edge.target_id] = edge
                 if edge.target_id not in queued:
                     queue.append(edge.target_id)
                     queued.add(edge.target_id)
 
         self.progress.step(processed, processed, f"{len(required)} node(s) affected")
         self._depth = depth
+        self._flow_reached = flow_reached
+        self._truncated = truncated
         return required, self._reconstruct_paths(required, parents), arriving
+
+    def _candidate(
+        self, edge: Edge, source: Node, source_required: Capacity, target: Node
+    ) -> Optional[Capacity]:
+        """What ``target`` must hold once ``source`` needs ``source_required``."""
+        if edge.kind is EdgeKind.STRING:
+            return self._string_requirement(edge, source, source_required, target)
+        if edge.kind is EdgeKind.GROUP_PARENT:
+            return self._group_requirement(edge, source, source_required, target)
+        return _required_at_target(edge, source.capacity, source_required, target.capacity)
+
+    def _accumulate(self, key: tuple[str, ...], member: str, amount: int) -> int:
+        """Record what ``member`` adds to ``key`` and return the new total."""
+        previous = self._contribution.get((key, member), 0)
+        if amount != previous:
+            self._contribution[(key, member)] = amount
+            self._growth[key] = self._growth.get(key, 0) + amount - previous
+        return self._growth.get(key, 0)
+
+    def _string_requirement(
+        self, edge: Edge, source: Node, source_required: Capacity, target: Node
+    ) -> Optional[Capacity]:
+        """A STRING target holds the sum of its sources, plus its literals.
+
+        Growing it by each source's increase over-reported a target that had
+        room to spare (60 characters STRINGed into 70 needs nothing) and, when
+        two sources both widened, kept only the larger increase.
+        """
+        key = ("string", edge.target_id, edge.ref.path, str(edge.ref.line))
+        before = _sliced_width(source.capacity, edge.source_slice)
+        after = _sliced_width(source_required, edge.source_slice)
+        growth = self._accumulate(key, edge.source_id, max(after - before, 0))
+        if growth <= 0:
+            return None
+        base = self._string_base.get(key)
+        if base is None:
+            base = self._statement_width(edge)
+            self._string_base[key] = base
+        total = base + growth
+        current = target.capacity
+        if total <= current.chars:
+            return None
+        return Capacity(
+            kind=current.kind if current.kind is not Kind.UNKNOWN else Kind.GROUP,
+            chars=total,
+            int_digits=current.int_digits,
+            dec_digits=current.dec_digits,
+            signed=current.signed,
+        )
+
+    def _statement_width(self, edge: Edge) -> int:
+        """Width of everything one STRING statement concatenates, before the change."""
+        total = edge.extra_chars
+        for other in self.graph.in_edges.get(edge.target_id, []):
+            if (
+                other.kind is EdgeKind.STRING
+                and other.ref.path == edge.ref.path
+                and other.ref.line == edge.ref.line
+            ):
+                member = self.graph.nodes.get(other.source_id)
+                if member is not None:
+                    total += _sliced_width(member.capacity, other.source_slice)
+        return total
+
+    def _group_requirement(
+        self, edge: Edge, source: Node, source_required: Capacity, target: Node
+    ) -> Optional[Capacity]:
+        """A group grows by the bytes every member adds, times its OCCURS.
+
+        Growing it by one member's increase at a time kept only the largest,
+        ignored OCCURS, and measured packed and binary fields in display
+        characters rather than bytes.
+        """
+        item = source.field_ref
+        if item is not None and item.redefines:
+            return None  # shares storage already counted; see copybook.finalize
+        occurs = max(item.occurs, 1) if item is not None else 1
+        added = _storage_growth(source, source_required) * occurs
+        growth = self._accumulate(("group", edge.target_id), edge.source_id, added)
+        if growth <= 0:
+            return None
+        return Capacity(kind=Kind.GROUP, chars=target.capacity.chars + growth)
 
     def _reconstruct_paths(
         self, required: dict[str, Capacity], parents: dict[str, str]
@@ -694,7 +892,7 @@ class ImpactAnalyzer:
 
         for node_id, need in required.items():
             node = self.graph.nodes.get(node_id)
-            if node is None:
+            if node is None or node.kind is NodeKind.DECLARATION:
                 continue
             distance = self._depth.get(node_id, 0)
             path = paths.get(node_id, [node_id])
@@ -779,9 +977,14 @@ class ImpactAnalyzer:
     ) -> Finding:
         entries = self._node_fields.get(node.node_id, [])
         item = entries[0][1] if entries else node.field_ref
-        refs = [entry[1].source for entry in entries if entry[1].source]
-        if edge is not None:
-            refs = [edge.ref] + refs
+        declared = [entry[1].source for entry in entries if entry[1].source]
+        # A REDEFINES or copybook edge points at the declaration itself, which
+        # is already listed; one location is one line of the report. Where they
+        # collide the declaration wins, because it names this program.
+        by_location = {(ref.path, ref.line): ref for ref in ([edge.ref] if edge else [])}
+        for ref in declared:
+            by_location[(ref.path, ref.line)] = ref
+        refs = list(by_location.values())
 
         if item is not None and item.is_group:
             new_bytes = max(need.chars, item.storage_bytes)
@@ -807,7 +1010,6 @@ class ImpactAnalyzer:
                 notes=self._redefines_notes(node.node_id, new_bytes),
             )
 
-        severity = Severity.CRITICAL if edge is not None and edge.kind.truncates else Severity.HIGH
         usage = item.usage if item is not None else "DISPLAY"
         current_pic = item.picture if item is not None else ""
         suggested = (
@@ -818,6 +1020,35 @@ class ImpactAnalyzer:
         declaration = item.declaration() if item is not None else node.name
         level = item.level if item is not None else 5
         new_declaration = _redeclare(declaration, current_pic, suggested)
+        current = f"{level:02d} {node.name} PIC {current_pic or '(none)'} {usage}".strip()
+
+        if node.node_id not in self._flow_reached:
+            # Widened because its copybook is edited for another program; no
+            # wider value reaches it here. The edit is the other program's, so
+            # this is a rebuild, not a truncation.
+            book = Path(item.source.path).name if item is not None and item.source else "its copybook"
+            return Finding(
+                severity=Severity.LOW,
+                category="copybook-field",
+                node_id=node.node_id,
+                title=f"{node.name} widens with {book}",
+                detail=(
+                    f"{book} is edited because another program needs this field to "
+                    f"hold {need.describe()}. No widened value reaches it in this "
+                    "program, so rebuilding against the new copybook is enough, "
+                    "unless a statement here assumes the old width."
+                ),
+                current=current,
+                required=need.describe(),
+                # The same edit the other program's finding asks for, worded the
+                # same, so a per-file view folds the two into one line.
+                remediation=f"Change to: {new_declaration}",
+                distance=distance,
+                path=path,
+                refs=refs,
+            )
+
+        severity = Severity.CRITICAL if node.node_id in self._truncated else Severity.HIGH
         return Finding(
             severity=severity,
             category="host-variable" if distance <= 1 else "derived-variable",
@@ -828,7 +1059,7 @@ class ImpactAnalyzer:
                 f"but {need.describe()} arrives here. COBOL truncates on the left for "
                 "numerics and on the right for alphanumerics, without any runtime error."
             ),
-            current=f"{level:02d} {node.name} PIC {current_pic or '(none)'} {usage}".strip(),
+            current=current,
             required=need.describe(),
             remediation=f"Change to: {new_declaration}",
             distance=distance,
@@ -1128,11 +1359,57 @@ def _required_at_target(
         return target_current.grown_to_hold(source_required)
     if edge.kind in _COMBINING or edge.kind in _LAYOUT:
         return _grow_by_delta(target_current, source_current, source_required)
-    if edge.kind is EdgeKind.UNSTRING:
-        # One delimited piece of the source lands here; it can be as long as the
-        # whole widened source in the worst case.
-        return target_current.grown_to_hold(source_required)
-    return target_current.grown_to_hold(source_required)
+    carried = source_required
+    if edge.source_slice is not None:
+        # MOVE CUST-NAME (1:20) moves 20 characters however wide CUST-NAME
+        # grows. Passing the whole field on reported the target, and every
+        # column it was later bound to, as needing to grow.
+        if edge.source_slice.length is not None:
+            return None
+        width = edge.source_slice.width(source_required.text_width)
+        if width is not None:
+            carried = Capacity(kind=Kind.ALPHANUMERIC, chars=width)
+    if edge.target_slice is not None:
+        # A literal length on the target caps what lands there.
+        if edge.target_slice.length is not None:
+            return None
+        if edge.target_slice.offset is not None:
+            carried = Capacity(
+                kind=Kind.ALPHANUMERIC,
+                chars=edge.target_slice.offset - 1 + carried.text_width,
+            )
+    # UNSTRING lands here too: one delimited piece of the source can be as long
+    # as the whole widened source in the worst case.
+    return target_current.grown_to_hold(carried)
+
+
+def _sliced_width(capacity: Capacity, piece: Optional[Slice]) -> int:
+    """Characters a (possibly reference-modified) item contributes as text."""
+    width = capacity.text_width
+    if piece is None:
+        return width
+    sliced = piece.width(width)
+    return width if sliced is None else sliced
+
+
+def _storage_growth(node: Node, need: Capacity) -> int:
+    """Bytes ``node`` gains when it grows to hold ``need``.
+
+    Bytes, not characters: S9(9)V99 COMP-3 to S9(11)V99 COMP-3 is two more
+    digits but one more byte, and an edited picture adds its punctuation.
+    """
+    current = node.capacity
+    if current.covers(need):
+        return 0
+    item = node.field_ref
+    if item is None or not item.picture:
+        if current.kind is Kind.GROUP or (item is not None and item.is_group):
+            return max(need.chars - current.chars, 0)
+        return max(need.text_width - current.text_width, 0)
+    rendered = picture.render_picture(need, item.usage, template=item.picture)
+    info = picture.parse_picture(rendered, item.usage, item.sign_separate)
+    grown = info.storage_bytes + (2 if item.varying else 0)
+    return max(grown - item.storage_bytes, 0)
 
 
 def _grow_by_delta(

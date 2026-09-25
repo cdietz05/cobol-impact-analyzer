@@ -85,9 +85,11 @@ def _hub_analyzer(feeders: int = 50, fanout: int = 50, hubs: int = 1) -> ImpactA
         graph.add_node(Node(feeder_id, NodeKind.VARIABLE, f"FEEDER-{index}", _text(59 - index)))
         graph.add_edge(Edge(SEED_ID, feeder_id, EdgeKind.SQL_FETCH, REF))
         for hub_id in hub_ids:
-            # STRING is a combining edge: the hub grows by the amount the feeder
-            # grew, which differs per feeder because their originals differ.
-            graph.add_edge(Edge(feeder_id, hub_id, EdgeKind.STRING, REF))
+            # ARITHMETIC grows the hub by the amount the feeder grew, which
+            # differs per feeder because their originals differ. Not STRING:
+            # every edge here shares REF, and STRING sources on one statement
+            # are added together rather than taken one at a time.
+            graph.add_edge(Edge(feeder_id, hub_id, EdgeKind.ARITHMETIC, REF))
 
     for index in range(fanout):
         leaf_id = f"var:LEAF-{index}"

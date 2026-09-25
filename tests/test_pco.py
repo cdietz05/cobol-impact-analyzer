@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 
 from cobol_impact_analyzer.copybook import CopybookResolver
-from cobol_impact_analyzer.models import EdgeKind, SourceRef
-from cobol_impact_analyzer.pco import ProgramParser, discover_sources
+from cobol_impact_analyzer.models import EdgeKind, Slice, SourceRef
+from cobol_impact_analyzer.pco import ProgramParser, _call_arguments, discover_sources
 from cobol_impact_analyzer.sqlparse import Direction, SqlAnalyzer
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
@@ -171,6 +171,33 @@ class ProgramParsingTests(unittest.TestCase):
         self.assertEqual(len(program.calls), 1)
         self.assertEqual(program.calls[0].target, "FMTNAME")
         self.assertEqual(program.calls[0].args, ["CUST-NAME", "WS-FULL-ADDRESS"])
+
+    def test_a_literal_argument_keeps_its_position(self):
+        # Dropping the literal paired WS-SNAPSHOT-NAME with the callee's FIRST
+        # parameter instead of its second.
+        program = _program("cust_update.pco")
+        args = _call_arguments(program, " BY CONTENT 'X' BY REFERENCE WS-SNAPSHOT-NAME")
+        self.assertEqual(args, ["", "WS-SNAPSHOT-NAME"])
+
+    def test_address_of_and_omitted_hold_a_position_too(self):
+        program = _program("cust_update.pco")
+        args = _call_arguments(program, " ADDRESS OF CUST-NAME OMITTED WS-AUDIT-TEXT")
+        self.assertEqual(args, ["", "", "WS-AUDIT-TEXT"])
+
+    def test_a_reference_modified_source_records_its_range(self):
+        program = _program("cust_update.pco")
+        [flow] = [
+            flow
+            for flow in program.flows
+            if flow.kind is EdgeKind.MOVE and flow.target == "WS-SNAPSHOT-NAME"
+        ]
+        self.assertEqual(flow.source_slices["CUST-NAME"], Slice(offset=1, length=20))
+
+    def test_reference_modification_is_not_blamed_on_the_target(self):
+        # MOVE CUST-NAME (1:20) TO WS-SNAPSHOT-NAME: the range is on CUST-NAME.
+        program = _program("cust_update.pco")
+        names = {u.name for u in program.usages if u.category == "reference-modification"}
+        self.assertNotIn("WS-SNAPSHOT-NAME", names)
 
     def test_linkage_using_order(self):
         program = _program("fmtname.pco")

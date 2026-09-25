@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10 18:54:22Z",
+  "generated_at": "2026-09-25 15:48:49Z",
   "spec": {
     "changes": [
       {
@@ -22,10 +22,10 @@
       }
     ],
     "source_paths": [
-      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src"
+      "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src"
     ],
     "copybook_paths": [
-      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src"
+      "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src"
     ],
     "source_patterns": [
       "*.pco",
@@ -55,14 +55,14 @@
   "program_impacts": [
     {
       "program": "WVLOAD",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
       "verdict": "source change",
       "recompile_only": false,
       "changed_copybooks": [],
       "own_work": [
         "WV-CUST-NAME must widen (alphanumeric(30) -> alphanumeric(50))",
-        "WV-CUTBLA-KEY must widen (group(42) -> group(62))",
-        "WV-CUTBLA-VIEW must widen (group(50) -> group(70))",
+        "WV-CUTBLA-KEY must widen (group(42) -> group(65))",
+        "WV-CUTBLA-VIEW must widen (group(50) -> group(73))",
         "WV-VALUE must widen (signed numeric(10.2) -> signed numeric(13.2))"
       ]
     }
@@ -85,14 +85,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 38,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "SELECT CB_VALUE, CB_NAME INTO :WV-VALUE, :WV-CUST-NAME FROM CUTBLA WHERE CB_ID = 1"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 33,
           "program": "WVLOAD",
           "paragraph": "",
@@ -117,14 +117,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 38,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "SELECT CB_VALUE, CB_NAME INTO :WV-VALUE, :WV-CUST-NAME FROM CUTBLA WHERE CB_ID = 1"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 31,
           "program": "WVLOAD",
           "paragraph": "",
@@ -136,11 +136,11 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:WVLOAD::WV-CUTBLA-KEY",
-      "title": "WV-CUTBLA-KEY: record length grows 42 -> 62 bytes",
+      "title": "WV-CUTBLA-KEY: record length grows 42 -> 65 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
       "current": "42 bytes",
-      "required": "62 bytes",
+      "required": "65 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 2,
       "propagation_path": [
@@ -150,14 +150,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 33,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "05  WV-CUST-NAME PIC X(30)"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 30,
           "program": "WVLOAD",
           "paragraph": "",
@@ -169,13 +169,13 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:WVLOAD::WV-CUTBLA-VIEW",
-      "title": "WV-CUTBLA-VIEW: record length grows 50 -> 70 bytes",
+      "title": "WV-CUTBLA-VIEW: record length grows 50 -> 73 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [
-        "overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 70)"
+        "overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 73)"
       ],
       "current": "50 bytes",
-      "required": "70 bytes",
+      "required": "73 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 3,
       "propagation_path": [
@@ -186,14 +186,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 30,
           "program": "WVLOAD",
           "paragraph": "",
           "text": "03  WV-CUTBLA-KEY"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
           "line": 24,
           "program": "WVLOAD",
           "paragraph": "",
@@ -237,7 +237,7 @@
   "programs": [
     {
       "name": "WVLOAD",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\redefines\\src\\wvload.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/redefines/src/wvload.pco",
       "sql_statements": 4,
       "data_items": 8,
       "copybooks": []

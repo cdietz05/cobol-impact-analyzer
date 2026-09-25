@@ -31,7 +31,9 @@ class Progress:
         self.enabled = enabled
         self.min_interval = min_interval
         self._tty = bool(getattr(self.stream, "isatty", lambda: False)())
-        self._last_emit = 0.0
+        # Not 0.0: time.monotonic() has no fixed epoch and can be close to
+        # zero, which throttled away the very first step.
+        self._last_emit = float("-inf")
         self._line_open = False
         self._start = time.monotonic()
 

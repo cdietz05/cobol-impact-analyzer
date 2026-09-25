@@ -1,6 +1,6 @@
 # CUTBLA widening — changes by file
 
-_Generated 2026-09-10 18:54:22Z._
+_Generated 2026-09-25 15:48:49Z._
 
 ## Requested change
 
@@ -15,9 +15,9 @@ Findings: CRITICAL 2, MEDIUM 2, INFO 2.
 
 - **WV-CUST-NAME** (line 33, CRITICAL): `05 WV-CUST-NAME PIC X(30) DISPLAY` → `05 WV-CUST-NAME PIC X(50).`
 - **WV-VALUE** (line 31, CRITICAL): `05 WV-VALUE PIC S9(10)V9(2) DISPLAY` → `05 WV-VALUE PIC S9(13)V9(2).`
-- **WV-CUTBLA-KEY** — MEDIUM — WV-CUTBLA-KEY: record length grows 42 -> 62 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
-- **WV-CUTBLA-VIEW** — MEDIUM — WV-CUTBLA-VIEW: record length grows 50 -> 70 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
-  - overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 70)
+- **WV-CUTBLA-KEY** — MEDIUM — WV-CUTBLA-KEY: record length grows 42 -> 65 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
+- **WV-CUTBLA-VIEW** — MEDIUM — WV-CUTBLA-VIEW: record length grows 50 -> 73 bytes: Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.
+  - overlays the same storage (REDEFINES): 01 WV-DATA PIC X(4096) (4096 bytes, still fits the new 73)
 
 ## Recompile only (rebuild, no source edit)
 

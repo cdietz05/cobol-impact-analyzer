@@ -305,18 +305,46 @@ def render_picture(capacity: Capacity, usage: str = "DISPLAY", template: str = "
 
 
 def _widen_edited(template: str, capacity: Capacity) -> str:
-    """Grow an edited picture by padding its leading digit positions.
+    """Grow an edited picture, keeping its shape.
 
-    ``ZZ,ZZ9.99`` widened to 8 integer digits becomes ``ZZZ,ZZZ,ZZ9.99`` in a
-    real shop; reproducing comma grouping exactly is more trouble than it is
-    worth, so the leading float positions are padded and the punctuation left
-    alone.  The report always shows the original next to the suggestion.
+    ``ZZ,ZZ9.99`` widened to 8 integer digits becomes ``ZZZ,ZZZ,ZZ9.99``: the
+    new positions take the leading float symbol, and a picture that groups its
+    digits with commas keeps grouping them in threes. Padding the front and
+    leaving the commas where they were gave ``ZZZZZ,ZZZ,ZZ9.99``, which nobody
+    would write. A shape too unusual to rebuild safely (floating ``$``, ``+``
+    or ``-``, ``B`` or ``/`` insertion) falls back to padding the front.
     """
     body = _strip_terminator(template).upper()
+    flat = re.sub(r"([9Z*X,.V])\((\d+)\)", lambda m: m.group(1) * int(m.group(2)), body)
+    match = re.fullmatch(r"([^Z*9,.V]*)([Z*9,]+)([.V])?([Z*9]*)(.*)", flat)
+    if match is not None:
+        prefix, whole, point, fraction, suffix = match.groups()
+        digits = whole.replace(",", "")
+        shape = re.fullmatch(r"([Z*]*)(9*)", digits)
+        if shape is not None and not re.search(r"[Z*9]", prefix + suffix):
+            int_deficit = capacity.int_digits - len(digits)
+            dec_deficit = capacity.dec_digits - len(fraction)
+            if int_deficit <= 0 and dec_deficit <= 0:
+                return template
+            floats, nines = shape.groups()
+            count = max(len(digits), capacity.int_digits)
+            fill = floats[:1] or "9"
+            new_digits = fill * (count - len(nines)) + nines
+            if "," in whole:
+                groups = []
+                while new_digits:
+                    groups.insert(0, new_digits[-3:])
+                    new_digits = new_digits[:-3]
+                new_digits = ",".join(groups)
+            if dec_deficit > 0:
+                fraction += (fraction[-1:] or "9") * dec_deficit
+                point = point or "V"
+            return f"{prefix}{new_digits}{point or ''}{fraction}{suffix}"
+
     current = 0
-    for match in _SYMBOL_RE.finditer(body):
-        symbol = match.group(1).upper()
-        count = int(match.group(2)) if match.group(2) else 1
+    for symbol_match in _SYMBOL_RE.finditer(body):
+        symbol = symbol_match.group(1).upper()
+        count = int(symbol_match.group(2)) if symbol_match.group(2) else 1
         if symbol in ("9", "Z", "*"):
             current += count
     deficit = capacity.total_digits - current

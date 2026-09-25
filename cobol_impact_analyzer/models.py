@@ -322,6 +322,9 @@ class EdgeKind(str, enum.Enum):
     INITIALIZE = "initialize"
     DISPLAY = "display"
     REFMOD = "reference-modification"
+    # Two programs' copies of one copybook declaration. Editing the copybook
+    # widens the field for every program that includes it.
+    SHARED_DECLARATION = "shared-declaration"
 
     @property
     def truncates(self) -> bool:
@@ -339,6 +342,28 @@ class EdgeKind(str, enum.Enum):
         )
 
 
+@dataclass(frozen=True)
+class Slice:
+    """A reference-modification range, ``FIELD(offset:length)``.
+
+    ``offset`` and ``length`` are the literal values, or None when the source
+    computes them at run time. ``open_ended`` is ``FIELD(5:)``, which runs to the
+    end of the field.
+    """
+
+    offset: Optional[int]
+    length: Optional[int]
+    open_ended: bool = False
+
+    def width(self, field_width: int) -> Optional[int]:
+        """Characters the slice covers in a field this wide, or None if unknown."""
+        if self.length is not None:
+            return self.length
+        if self.open_ended and self.offset is not None:
+            return max(field_width - self.offset + 1, 0)
+        return None
+
+
 @dataclass
 class Edge:
     """A directed data-flow edge discovered in the source."""
@@ -348,6 +373,13 @@ class Edge:
     kind: EdgeKind
     ref: SourceRef
     note: str = ""
+    # Reference modification on either end. A slice with a literal length
+    # carries that many characters however wide the field becomes.
+    source_slice: Optional[Slice] = None
+    target_slice: Optional[Slice] = None
+    # STRING only: characters of quoted literals in the same statement. They
+    # take room in the target on top of the data items.
+    extra_chars: int = 0
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -365,6 +397,8 @@ class NodeKind(str, enum.Enum):
     FILE_RECORD = "file-record"
     PROGRAM_ARG = "program-arg"
     LITERAL = "literal"
+    # One copybook declaration, joining every program's copy of that field.
+    DECLARATION = "declaration"
 
 
 @dataclass

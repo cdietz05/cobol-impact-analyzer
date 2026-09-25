@@ -90,6 +90,19 @@ class PictureTests(unittest.TestCase):
         )
         self.assertEqual(rendered, "S9(11)V9(2)")
 
+    def test_widened_edited_picture_keeps_its_comma_grouping(self):
+        need = Capacity(kind=Kind.NUMERIC_EDITED, int_digits=11, dec_digits=2, signed=True)
+        # Padding the front gave ZZZZZ,ZZZ,ZZ9.99-, which nobody would write.
+        self.assertEqual(render_picture(need, template="ZZ,ZZZ,ZZ9.99-"), "ZZ,ZZZ,ZZZ,ZZ9.99-")
+
+    def test_widened_edited_picture_without_commas_stays_without_them(self):
+        need = Capacity(kind=Kind.NUMERIC_EDITED, int_digits=7, dec_digits=2)
+        self.assertEqual(render_picture(need, template="Z(4)9.99"), "ZZZZZZ9.99")
+
+    def test_an_edited_picture_already_wide_enough_is_left_alone(self):
+        need = Capacity(kind=Kind.NUMERIC_EDITED, int_digits=5, dec_digits=2)
+        self.assertEqual(render_picture(need, template="ZZ,ZZ9.99"), "ZZ,ZZ9.99")
+
 
 class CapacityTests(unittest.TestCase):
     def test_text_covers_shorter_text(self):

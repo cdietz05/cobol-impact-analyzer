@@ -21,14 +21,13 @@ from . import cobolsrc, copybook as cb
 from . import progress as progress_mod
 from .cobolsrc import LogicalLine, normalize_name
 from .copybook import _PRUNED_DIRS, CopybookResolver, DataMap
-from .models import EdgeKind, SourceRef
+from .models import EdgeKind, Slice, SourceRef
 from .progress import Progress
 from .sqlparse import SqlAnalyzer, SqlStatement
 
 _NAME = r"[A-Za-z][A-Za-z0-9_\-#@$]*"
 _NAME_RE = re.compile(_NAME)
 _REFMOD_RE = re.compile(rf"({_NAME})\s*\((?P<args>[^()]*:[^()]*)\)")
-_SUBSCRIPT_RE = re.compile(rf"({_NAME})\s*\(([^():]*)\)")
 
 _PROGRAM_ID_RE = re.compile(r"PROGRAM-ID\s*\.?\s*([A-Za-z0-9][A-Za-z0-9_\-#@$]*)", re.I)
 _EXEC_SQL_START_RE = re.compile(r"(?<![A-Za-z0-9_\-#@$])EXEC\s+SQL(?![A-Za-z0-9_\-#@$])", re.I)
@@ -80,6 +79,11 @@ class Flow:
     ref: SourceRef
     note: str = ""
     combines: bool = False  # sources concatenate rather than each fitting alone
+    # Reference modification written on a source or on the target, by name.
+    source_slices: dict[str, Slice] = field(default_factory=dict)
+    target_slice: Optional[Slice] = None
+    # STRING only: characters of quoted literals among the sources.
+    literal_chars: int = 0
 
 
 @dataclass
@@ -97,6 +101,9 @@ class CallSite:
     """A ``CALL 'X' USING ...`` with its argument list in order."""
 
     target: str
+    # One entry per argument, in order. An argument that is not a data item
+    # (a literal, ADDRESS OF, LENGTH OF, OMITTED) is an empty string, so it
+    # still holds its position against the callee's LINKAGE list.
     args: list[str]
     ref: SourceRef
     # True when the target was written as an identifier rather than a literal
@@ -525,6 +532,8 @@ def _handle_move(program: Program, chunk: str, ref: SourceRef) -> None:
         if literal:
             for target in targets:
                 _remember_literal(program, target, literal)
+    source_slices = _slices(source_text)
+    target_slices = _slices(target_text)
     for target in targets:
         program.flows.append(
             Flow(
@@ -533,18 +542,12 @@ def _handle_move(program: Program, chunk: str, ref: SourceRef) -> None:
                 kind=EdgeKind.MOVE,
                 ref=ref,
                 note=note,
+                source_slices={
+                    name: source_slices[name] for name in sources[:1] if name in source_slices
+                },
+                target_slice=target_slices.get(target),
             )
         )
-    if _REFMOD_RE.search(source_text) or _REFMOD_RE.search(target_text):
-        for target in targets:
-            program.usages.append(
-                Usage(
-                    name=target,
-                    category="reference-modification",
-                    ref=ref,
-                    detail="MOVE uses a hard-coded offset/length that will not follow a width change",
-                )
-            )
 
 
 def _move_corresponding(
@@ -590,6 +593,8 @@ def _handle_string(program: Program, chunk: str, ref: SourceRef) -> None:
         r"(?<![A-Za-z0-9_\-#@$])DELIMITED\s+BY\s+(SIZE|[^\s]+)", " ", source_text, flags=re.I
     )
     sources = known_identifiers(program, concatenated)
+    source_slices = _slices(concatenated)
+    literal_chars = sum(len(literal) for literal in _quoted_literals(concatenated))
     target_text, _ = _split_on_keyword(target_text, "WITH")
     targets = known_identifiers(program, target_text)
     for target in targets[:1]:
@@ -601,6 +606,10 @@ def _handle_string(program: Program, chunk: str, ref: SourceRef) -> None:
                 ref=ref,
                 note="concatenated result",
                 combines=True,
+                source_slices={
+                    name: source_slices[name] for name in sources if name in source_slices
+                },
+                literal_chars=literal_chars,
             )
         )
 
@@ -714,8 +723,51 @@ def _handle_call(program: Program, chunk: str, ref: SourceRef) -> None:
         return
     using_text, _ = _split_on_keyword(using_text, "RETURNING")
     using_text, _ = _split_on_keyword(using_text, "ON")
-    args = known_identifiers(program, using_text)
+    args = _call_arguments(program, using_text)
     program.calls.append(CallSite(target=target, args=args, ref=ref, dynamic=dynamic))
+
+
+_ARGUMENT_TOKEN_RE = re.compile(
+    r"'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\"|[+-]?\d+(?:\.\d+)?|[A-Za-z][A-Za-z0-9_\-#@$]*"
+)
+# Words in a USING list that pass no argument of their own.
+_ARGUMENT_NOISE = frozenset({"BY", "REFERENCE", "CONTENT", "VALUE", "NOT", "END-CALL"})
+_FIGURATIVE = frozenset(
+    """
+    SPACE SPACES ZERO ZEROS ZEROES LOW-VALUE LOW-VALUES HIGH-VALUE HIGH-VALUES
+    QUOTE QUOTES NULL NULLS OMITTED
+    """.split()
+)
+
+
+def _call_arguments(program: Program, using_text: str) -> list[str]:
+    """The USING list, one entry per argument position.
+
+    Literals and other non-data arguments are kept as empty strings. Dropping
+    them shifted every later argument against the callee's LINKAGE list, so
+    ``CALL 'X' USING BY CONTENT 'Y' WS-A`` paired WS-A with the callee's FIRST
+    parameter, and compared the wrong fields.
+    """
+    tokens = [match.group(0) for match in _ARGUMENT_TOKEN_RE.finditer(strip_subscripts(using_text))]
+    args: list[str] = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        upper = token.upper()
+        following = tokens[index + 1].upper() if index + 1 < len(tokens) else ""
+        index += 1
+        if upper in ("OF", "IN"):
+            index += 1  # A OF B names A; B only qualifies it
+        elif upper in ("ADDRESS", "LENGTH") and following == "OF":
+            args.append("")  # a pointer or a length, not the item itself
+            index += 2
+        elif token[0] in "'\"+-" or token[0].isdigit() or upper in _FIGURATIVE:
+            args.append("")
+        elif upper in _ARGUMENT_NOISE or upper in _RESERVED:
+            continue
+        else:
+            args.append(upper if program.data.get(upper) is not None else "")
+    return args
 
 
 def _handle_write(program: Program, chunk: str, ref: SourceRef) -> None:
@@ -851,6 +903,30 @@ _HANDLERS = {
     "INSPECT": _handle_inspect,
     "SET": _handle_set,
 }
+
+
+def _slices(text: str) -> dict[str, Slice]:
+    """Reference-modification ranges in ``text``, by the name they modify."""
+    found: dict[str, Slice] = {}
+    for match in _REFMOD_RE.finditer(text or ""):
+        offset_text, _, length_text = match.group("args").partition(":")
+        offset_text, length_text = offset_text.strip(), length_text.strip()
+        found.setdefault(
+            match.group(1).upper(),
+            Slice(
+                offset=int(offset_text) if offset_text.isdigit() else None,
+                length=int(length_text) if length_text.isdigit() else None,
+                open_ended=not length_text,
+            ),
+        )
+    return found
+
+
+def _quoted_literals(text: str) -> list[str]:
+    return [
+        (match.group(1) if match.group(1) is not None else match.group(2))
+        for match in _QUOTED_RE.finditer(text or "")
+    ]
 
 
 def _record_refmods(program: Program, chunk: str, ref: SourceRef) -> None:

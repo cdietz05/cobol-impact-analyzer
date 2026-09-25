@@ -283,10 +283,23 @@ the record length, which forces every `REDEFINES` of that group to change too.
    **finding**, reported with the path that reached it.
 
 Edges are not all the same. A `MOVE` requires the destination to hold the whole
-source. A `STRING` or `COMPUTE` only requires the destination to grow by the
-*delta*, because it was already sized for the other operands. Group and
-`REDEFINES` edges grow by the byte delta, not the character delta — which is why
-a `COMP-3` field widening by two digits grows its record by one byte, not two.
+source — unless the source is reference-modified with a literal length, as in
+`MOVE CUST-NAME (1:20)`, which moves 20 characters however wide the field gets.
+A `STRING` target must hold the sum of every source plus its literals, so a
+target with room to spare needs nothing, and two widened sources add up. A
+`COMPUTE` or arithmetic result grows by the *delta*, because it was already
+sized for the other operands. A group grows by the bytes each member adds,
+times its `OCCURS` — which is why a `COMP-3` field widening by two digits grows
+its record by one byte, not two, and a 100-entry table of them by 100. A
+`REDEFINES` is an overlay: the item it overlays only has to be big enough for
+the grown layout, so a buffer that already reserves the room needs nothing.
+
+A field declared in a copybook is one node per program, because each program
+compiles its own copy. But the copybook is one file: once any program needs
+`CUST-NAME` wider, it widens in every program that includes it, and every one of
+those programs sees the longer record. Where no widened value reaches the field
+in a program, it is reported as a `LOW` `copybook-field` finding — rebuild, not
+edit — and it does not carry the wider width on through that program's `MOVE`s.
 
 ---
 
@@ -297,7 +310,7 @@ a `COMP-3` field widening by two digits grows its record by one byte, not two.
 | `CRITICAL` | Silent data loss. A wider value lands in a field too small for it through a **truncating** edge — `SELECT`/`FETCH INTO`, `MOVE`, `STRING`/`UNSTRING`, `COMPUTE`, arithmetic, `WRITE FROM`, `READ INTO`, reference modification. COBOL drops the overflow with no error: trailing characters for text, high-order digits for numbers. |
 | `HIGH` | Wrong, but it surfaces. Another database column receives the value and needs its own `ALTER` (`ORA-01401`/`ORA-12899`); or a field is undersized on a **non-truncating** path (`CALL` argument, host variable in a `WHERE`, `REDEFINES` over shared storage); or a hard-coded reference modification no longer spans the field. |
 | `MEDIUM` | Needs a human decision. A group/record length grew (every file, queue, `CALL` interface or `REDEFINES` on the old length must be rebuilt); a padded literal comparison or `INSPECT` shifts; a `VALUE` clause may be stale; or a column could not be traced at all (dynamic SQL, `SELECT *`, cursor in an unscanned copybook). |
-| `LOW` | Cosmetic or informational. `DISPLAY` alignment, `INITIALIZE`, `SET`. |
+| `LOW` | Cosmetic or informational. `DISPLAY` alignment, `INITIALIZE`, `SET`, or a copybook field that widens only because another program needs it (rebuild, no edit). |
 | `INFO` | The change you asked for, echoed back with its DDL. The root of every trace. |
 
 A field that trips several of these keeps one finding and takes the worst
@@ -438,9 +451,10 @@ Two other honest caveats:
   default. If your shop relies on naming conventions rather than shared
   copybooks, pass `--global-vars` — at the cost of some false positives on
   generic names like `WS-TEMP`.
-- Widened edited pictures (`ZZ,ZZZ,ZZ9.99`) are grown by padding leading float
-  positions. The suggestion is a starting point; comma grouping still deserves a
-  human eye. The original picture is always shown next to it.
+- Widened edited pictures (`ZZ,ZZZ,ZZ9.99`) keep their float symbol and comma
+  grouping. Floating `$`, `+` and `-`, and `B` or `/` insertion, are grown by
+  padding the front instead, and deserve a human eye. The original picture is
+  always shown next to it.
 
 ---
 

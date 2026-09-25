@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-10 18:54:22Z",
+  "generated_at": "2026-09-25 15:48:49Z",
   "spec": {
     "changes": [
       {
@@ -22,10 +22,10 @@
       }
     ],
     "source_paths": [
-      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src"
+      "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src"
     ],
     "copybook_paths": [
-      "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks"
+      "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks"
     ],
     "source_patterns": [
       "*.pco",
@@ -36,13 +36,13 @@
   },
   "summary": {
     "programs_scanned": 8,
-    "nodes": 191,
-    "edges": 195,
+    "nodes": 219,
+    "edges": 453,
     "findings": {
-      "CRITICAL": 25,
+      "CRITICAL": 23,
       "HIGH": 11,
-      "MEDIUM": 9,
-      "LOW": 0,
+      "MEDIUM": 12,
+      "LOW": 11,
       "INFO": 2
     },
     "programs_affected": 8,
@@ -53,62 +53,60 @@
     "ALTER TABLE CSS_CUSTOMER MODIFY CUST_BALANCE NUMBER(13,2);",
     "ALTER TABLE CSS_ACCOUNT MODIFY ACCT_BILL_NAME VARCHAR2(40);",
     "ALTER TABLE CSS_ACCT_AUDIT MODIFY AUDIT_BILL_NAME VARCHAR2(40);",
-    "ALTER TABLE CSS_ACCT_AUDIT MODIFY AUDIT_TEXT VARCHAR2(90);",
     "ALTER TABLE CSS_SVC_ORDER MODIFY SVC_CUST_NAME VARCHAR2(40);"
   ],
   "program_impacts": [
     {
-      "program": "CSACCTUPD",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
-      "verdict": "source change",
-      "recompile_only": false,
-      "changed_copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSACCT.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy"
-      ],
-      "own_work": [
-        "WS-AUDIT-TEXT must widen (alphanumeric(80) -> alphanumeric(90))"
-      ]
-    },
-    {
       "program": "CSBILLCYC",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
       "verdict": "source change",
       "recompile_only": false,
       "changed_copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSXTRACT.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSXTRACT.cpy"
       ],
       "own_work": [
         "CS-RL-FLAT used via display",
-        "EXTRACT-RECORD must widen (alphanumeric(80) -> alphanumeric(97))",
+        "EXTRACT-RECORD must widen (alphanumeric(80) -> alphanumeric(98))",
         "WS-NEW-BALANCE must widen (signed numeric(11.2) -> signed numeric(13.2))"
       ]
     },
     {
       "program": "CSCUSTINQ",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
       "verdict": "source change",
       "recompile_only": false,
       "changed_copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy"
       ],
       "own_work": [
         "CS-CUST-NAME used via reference-modification",
-        "CS-RL-FLAT used via display",
-        "CS-SHORT-NAME used via reference-modification"
+        "CS-RL-FLAT used via display"
+      ]
+    },
+    {
+      "program": "CSCUSTRPT",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustrpt.pco",
+      "verdict": "source change",
+      "recompile_only": false,
+      "changed_copybooks": [
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy"
+      ],
+      "own_work": [
+        "CS-RL-FLAT used via display"
       ]
     },
     {
       "program": "CSFMTNAM",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
       "verdict": "source change",
       "recompile_only": false,
       "changed_copybooks": [],
       "own_work": [
-        "LK-DISPLAY-KEY must widen (alphanumeric(40) -> alphanumeric(60))",
+        "LK-DISPLAY-KEY must widen (alphanumeric(40) -> alphanumeric(81))",
         "LK-RAW-NAME must widen (alphanumeric(30) -> alphanumeric(40))",
         "WS-FIRST-NAME must widen (alphanumeric(20) -> alphanumeric(40))",
         "WS-LAST-NAME must widen (alphanumeric(20) -> alphanumeric(40))",
@@ -118,45 +116,45 @@
     },
     {
       "program": "CSNOTES",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
       "verdict": "source change",
       "recompile_only": false,
       "changed_copybooks": [],
       "own_work": [
         "LK-CUST-NAME must widen (alphanumeric(30) -> alphanumeric(40))",
-        "LK-TECH-NOTES must widen (alphanumeric(60) -> alphanumeric(70))",
+        "LK-TECH-NOTES must widen (alphanumeric(60) -> alphanumeric(66))",
         "WS-NOTE-HEADER must widen (alphanumeric(30) -> alphanumeric(40))"
       ]
     },
     {
-      "program": "CSCUSTRPT",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustrpt.pco",
+      "program": "CSACCTUPD",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
       "verdict": "recompile only",
       "recompile_only": true,
       "changed_copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSACCT.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy"
       ],
       "own_work": []
     },
     {
       "program": "CSPURGE",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cspurge.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cspurge.pco",
       "verdict": "recompile only",
       "recompile_only": true,
       "changed_copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy"
       ],
       "own_work": []
     },
     {
       "program": "CSSVCORD",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
       "verdict": "recompile only",
       "recompile_only": true,
       "changed_copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSSVC.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy"
       ],
       "own_work": []
     }
@@ -179,14 +177,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
           "line": 27,
           "program": "CSACCTUPD",
           "paragraph": "",
           "text": "SELECT CUST_NAME, CUST_BALANCE INTO :CS-CUST-NAME, :CS-CUST-BALANCE FROM CSS_CUSTOMER WHERE CUST_ID = :CS-ACCT-CUST-ID"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 14,
           "program": "CSACCTUPD",
           "paragraph": "",
@@ -211,14 +209,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
           "line": 27,
           "program": "CSACCTUPD",
           "paragraph": "",
           "text": "SELECT CUST_NAME, CUST_BALANCE INTO :CS-CUST-NAME, :CS-CUST-BALANCE FROM CSS_CUSTOMER WHERE CUST_ID = :CS-ACCT-CUST-ID"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 7,
           "program": "CSACCTUPD",
           "paragraph": "",
@@ -243,14 +241,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 42,
           "program": "CSBILLCYC",
           "paragraph": "",
           "text": "FETCH BILL_CUR INTO :CS-CUST-ID, :CS-CUST-NAME, :CS-CUST-BALANCE, :CS-CUST-CYCLE"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 14,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -275,14 +273,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 42,
           "program": "CSBILLCYC",
           "paragraph": "",
           "text": "FETCH BILL_CUR INTO :CS-CUST-ID, :CS-CUST-NAME, :CS-CUST-BALANCE, :CS-CUST-CYCLE"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 7,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -307,14 +305,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 38,
           "program": "CSCUSTINQ",
           "paragraph": "",
           "text": "FETCH CUST_CUR INTO :CS-CUST-ID, :CS-CUST-NAME, :CS-CUST-CITY, :CS-CUST-STATE, :CS-CUST-BALANCE"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 14,
           "program": "CSCUSTINQ",
           "paragraph": "",
@@ -341,21 +339,21 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 38,
           "program": "CSCUSTINQ",
           "paragraph": "",
           "text": "FETCH CUST_CUR INTO :CS-CUST-ID, :CS-CUST-NAME, :CS-CUST-CITY, :CS-CUST-STATE, :CS-CUST-BALANCE"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 7,
           "program": "CSCUSTINQ",
           "paragraph": "",
           "text": "05  CS-CUST-NAME         PIC X(30)"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 59,
           "program": "CSCUSTINQ",
           "paragraph": "2000-FORMAT-LINE",
@@ -380,14 +378,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
           "line": 26,
           "program": "CSSVCORD",
           "paragraph": "",
           "text": "SELECT CUST_NAME INTO :CS-CUST-NAME FROM CSS_CUSTOMER WHERE CUST_ID = :CS-CUST-ID"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 7,
           "program": "CSSVCORD",
           "paragraph": "",
@@ -413,51 +411,18 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
           "line": 41,
           "program": "CSACCTUPD",
           "paragraph": "2000-SYNC-ACCOUNT",
           "text": "MOVE CS-CUST-NAME TO CS-ACCT-BILL-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSACCT.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSACCT.cpy",
           "line": 10,
           "program": "CSACCTUPD",
           "paragraph": "",
           "text": "05  CS-ACCT-BILL-NAME    PIC X(30)"
-        }
-      ]
-    },
-    {
-      "severity": "CRITICAL",
-      "category": "derived-variable",
-      "node": "var:CSACCTUPD::WS-AUDIT-TEXT",
-      "title": "WS-AUDIT-TEXT is too small for the widened value",
-      "detail": "Reached through a string edge at examples/css/src/csacctupd.pco:50. Current PIC holds alphanumeric(80), but alphanumeric(90) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
-      "current": "01 WS-AUDIT-TEXT PIC X(80) DISPLAY",
-      "required": "alphanumeric(90)",
-      "remediation": "Change to: 01 WS-AUDIT-TEXT PIC X(90).",
-      "hops_from_change": 2,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSACCTUPD::CS-CUST-NAME",
-        "var:CSACCTUPD::WS-AUDIT-TEXT"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
-          "line": 50,
-          "program": "CSACCTUPD",
-          "paragraph": "3000-WRITE-AUDIT",
-          "text": "STRING 'REBILL ' DELIMITED BY SIZE CS-CUST-NAME DELIMITED BY SIZE INTO WS-AUDIT-TEXT"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
-          "line": 15,
-          "program": "CSACCTUPD",
-          "paragraph": "",
-          "text": "01  WS-AUDIT-TEXT            PIC X(80)"
         }
       ]
     },
@@ -479,14 +444,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 59,
           "program": "CSBILLCYC",
           "paragraph": "2000-PRINT-LINE",
           "text": "MOVE CS-CUST-NAME    TO CS-RL-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 7,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -512,14 +477,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 51,
           "program": "CSBILLCYC",
           "paragraph": "1000-BILL-ONE",
           "text": "COMPUTE WS-NEW-BALANCE = CS-CUST-BALANCE + WS-CYCLE-CHARGES"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 22,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -545,51 +510,18 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 65,
           "program": "CSBILLCYC",
           "paragraph": "3000-WRITE-EXTRACT",
           "text": "MOVE CS-CUST-NAME   TO XT-CUST-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSXTRACT.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSXTRACT.cpy",
           "line": 7,
           "program": "CSBILLCYC",
           "paragraph": "",
           "text": "05  XT-CUST-NAME         PIC X(30)"
-        }
-      ]
-    },
-    {
-      "severity": "CRITICAL",
-      "category": "derived-variable",
-      "node": "var:CSCUSTINQ::CS-RL-BALANCE",
-      "title": "CS-RL-BALANCE is too small for the widened value",
-      "detail": "Reached through a move edge at examples/css/src/cscustinq.pco:53. Current PIC holds signed numeric(8.2), but signed numeric(11.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
-      "current": "05 CS-RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY",
-      "required": "signed numeric(11.2)",
-      "remediation": "Change to: 05 CS-RL-BALANCE PIC ZZZZZ,ZZZ,ZZ9.99-.",
-      "hops_from_change": 2,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_BALANCE",
-        "var:CSCUSTINQ::CS-CUST-BALANCE",
-        "var:CSCUSTINQ::CS-RL-BALANCE"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
-          "line": 53,
-          "program": "CSCUSTINQ",
-          "paragraph": "2000-FORMAT-LINE",
-          "text": "MOVE CS-CUST-BALANCE     TO CS-RL-BALANCE"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 11,
-          "program": "CSCUSTINQ",
-          "paragraph": "",
-          "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
         }
       ]
     },
@@ -611,53 +543,18 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 52,
           "program": "CSCUSTINQ",
           "paragraph": "2000-FORMAT-LINE",
           "text": "MOVE CS-CUST-NAME        TO CS-RL-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 7,
           "program": "CSCUSTINQ",
           "paragraph": "",
           "text": "05  CS-RL-NAME           PIC X(30)"
-        }
-      ]
-    },
-    {
-      "severity": "CRITICAL",
-      "category": "derived-variable",
-      "node": "var:CSCUSTINQ::CS-SHORT-NAME",
-      "title": "CS-SHORT-NAME is too small for the widened value",
-      "detail": "Reached through a move edge at examples/css/src/cscustinq.pco:59. Current PIC holds alphanumeric(20), but alphanumeric(40) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [
-        "reference-modification: the offset/length is hard-coded and will not follow the new width."
-      ],
-      "current": "01 CS-SHORT-NAME PIC X(20) DISPLAY",
-      "required": "alphanumeric(40)",
-      "remediation": "Change to: 01 CS-SHORT-NAME PIC X(40).",
-      "hops_from_change": 2,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSCUSTINQ::CS-SHORT-NAME"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
-          "line": 59,
-          "program": "CSCUSTINQ",
-          "paragraph": "2000-FORMAT-LINE",
-          "text": "MOVE CS-CUST-NAME (1:20) TO CS-SHORT-NAME"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 20,
-          "program": "CSCUSTINQ",
-          "paragraph": "",
-          "text": "01  CS-SHORT-NAME            PIC X(20)"
         }
       ]
     },
@@ -679,14 +576,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
           "line": 37,
           "program": "CSSVCORD",
           "paragraph": "2000-CREATE-ORDER",
           "text": "MOVE CS-CUST-NAME TO CS-SVC-CUST-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSSVC.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
           "line": 8,
           "program": "CSSVCORD",
           "paragraph": "",
@@ -703,7 +600,7 @@
       "notes": [],
       "current": "05 CS-RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY",
       "required": "signed numeric(13.2)",
-      "remediation": "Change to: 05 CS-RL-BALANCE PIC ZZZZZZZ,ZZZ,ZZ9.99-.",
+      "remediation": "Change to: 05 CS-RL-BALANCE PIC Z,ZZZ,ZZZ,ZZZ,ZZ9.99-.",
       "hops_from_change": 3,
       "propagation_path": [
         "col:CSS_CUSTOMER.CUST_BALANCE",
@@ -713,14 +610,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 60,
           "program": "CSBILLCYC",
           "paragraph": "2000-PRINT-LINE",
           "text": "MOVE WS-NEW-BALANCE  TO CS-RL-BALANCE"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 11,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -747,14 +644,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 67,
           "program": "CSBILLCYC",
           "paragraph": "3000-WRITE-EXTRACT",
           "text": "MOVE WS-NEW-BALANCE TO XT-BALANCE"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSXTRACT.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSXTRACT.cpy",
           "line": 9,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -783,60 +680,25 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 19,
           "program": "CSFMTNAM",
           "paragraph": "0000-MAIN",
           "text": "MOVE LK-RAW-NAME TO WS-WORK-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 10,
           "program": "CSFMTNAM",
           "paragraph": "",
           "text": "01  WS-WORK-NAME             PIC X(30)"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 20,
           "program": "CSFMTNAM",
           "paragraph": "0000-MAIN",
           "text": "INSPECT WS-WORK-NAME TALLYING WS-NAME-LEN FOR ALL ' '"
-        }
-      ]
-    },
-    {
-      "severity": "CRITICAL",
-      "category": "derived-variable",
-      "node": "var:CSBILLCYC::EXTRACT-RECORD",
-      "title": "EXTRACT-RECORD is too small for the widened value",
-      "detail": "Reached through a write-from edge at examples/css/src/csbillcyc.pco:68. Current PIC holds alphanumeric(80), but alphanumeric(97) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [],
-      "current": "01 EXTRACT-RECORD PIC X(80) DISPLAY",
-      "required": "alphanumeric(97)",
-      "remediation": "Change to: 01 EXTRACT-RECORD PIC X(97).",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSBILLCYC::CS-CUST-NAME",
-        "var:CSBILLCYC::XT-CUST-NAME",
-        "var:CSBILLCYC::CS-XTRACT-REC",
-        "var:CSBILLCYC::EXTRACT-RECORD"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
-          "line": 68,
-          "program": "CSBILLCYC",
-          "paragraph": "3000-WRITE-EXTRACT",
-          "text": "WRITE EXTRACT-RECORD FROM CS-XTRACT-REC"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
-          "line": 12,
-          "program": "CSBILLCYC",
-          "paragraph": "",
-          "text": "01  EXTRACT-RECORD          PIC X(80)"
         }
       ]
     },
@@ -860,14 +722,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 22,
           "program": "CSFMTNAM",
           "paragraph": "0000-MAIN",
           "text": "UNSTRING WS-WORK-NAME DELIMITED BY ',' INTO WS-LAST-NAME WS-FIRST-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 12,
           "program": "CSFMTNAM",
           "paragraph": "",
@@ -895,14 +757,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 22,
           "program": "CSFMTNAM",
           "paragraph": "0000-MAIN",
           "text": "UNSTRING WS-WORK-NAME DELIMITED BY ',' INTO WS-LAST-NAME WS-FIRST-NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 11,
           "program": "CSFMTNAM",
           "paragraph": "",
@@ -915,11 +777,11 @@
       "category": "derived-variable",
       "node": "var:CSNOTES::LK-TECH-NOTES",
       "title": "LK-TECH-NOTES is too small for the widened value",
-      "detail": "Reached through a string edge at examples/css/src/csnotes.pco:17. Current PIC holds alphanumeric(60), but alphanumeric(70) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a string edge at examples/css/src/csnotes.pco:17. Current PIC holds alphanumeric(60), but alphanumeric(66) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [],
       "current": "01 LK-TECH-NOTES PIC X(60) DISPLAY",
-      "required": "alphanumeric(70)",
-      "remediation": "Change to: 01 LK-TECH-NOTES PIC X(70).",
+      "required": "alphanumeric(66)",
+      "remediation": "Change to: 01 LK-TECH-NOTES PIC X(66).",
       "hops_from_change": 4,
       "propagation_path": [
         "col:CSS_CUSTOMER.CUST_NAME",
@@ -930,14 +792,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
           "line": 17,
           "program": "CSNOTES",
           "paragraph": "0000-MAIN",
           "text": "STRING 'CUST: '     DELIMITED BY SIZE LK-CUST-NAME DELIMITED BY SIZE ' - NEW SERVICE ORDER' DELIMITED BY SIZE INTO LK-TECH-NOTES"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
           "line": 13,
           "program": "CSNOTES",
           "paragraph": "",
@@ -965,14 +827,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
           "line": 16,
           "program": "CSNOTES",
           "paragraph": "0000-MAIN",
           "text": "MOVE LK-CUST-NAME TO WS-NOTE-HEADER"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
           "line": 10,
           "program": "CSNOTES",
           "paragraph": "",
@@ -983,32 +845,97 @@
     {
       "severity": "CRITICAL",
       "category": "derived-variable",
+      "node": "var:CSBILLCYC::EXTRACT-RECORD",
+      "title": "EXTRACT-RECORD is too small for the widened value",
+      "detail": "Reached through a write-from edge at examples/css/src/csbillcyc.pco:68. Current PIC holds alphanumeric(80), but alphanumeric(98) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "01 EXTRACT-RECORD PIC X(80) DISPLAY",
+      "required": "alphanumeric(98)",
+      "remediation": "Change to: 01 EXTRACT-RECORD PIC X(98).",
+      "hops_from_change": 5,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::XT-BALANCE",
+        "var:CSBILLCYC::CS-XTRACT-REC",
+        "var:CSBILLCYC::EXTRACT-RECORD"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
+          "line": 68,
+          "program": "CSBILLCYC",
+          "paragraph": "3000-WRITE-EXTRACT",
+          "text": "WRITE EXTRACT-RECORD FROM CS-XTRACT-REC"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
+          "line": 12,
+          "program": "CSBILLCYC",
+          "paragraph": "",
+          "text": "01  EXTRACT-RECORD          PIC X(80)"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
+      "node": "var:CSCUSTINQ::CS-RL-BALANCE",
+      "title": "CS-RL-BALANCE is too small for the widened value",
+      "detail": "Reached through a shared-declaration edge at examples/css/copybooks/CSWORK.cpy:11. Current PIC holds signed numeric(8.2), but signed numeric(13.2) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [],
+      "current": "05 CS-RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY",
+      "required": "signed numeric(13.2)",
+      "remediation": "Change to: 05 CS-RL-BALANCE PIC Z,ZZZ,ZZZ,ZZZ,ZZ9.99-.",
+      "hops_from_change": 5,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:11:CS-RL-BALANCE",
+        "var:CSCUSTINQ::CS-RL-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 11,
+          "program": "CSCUSTINQ",
+          "paragraph": "",
+          "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
+        }
+      ]
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "derived-variable",
       "node": "var:CSFMTNAM::LK-DISPLAY-KEY",
       "title": "LK-DISPLAY-KEY is too small for the widened value",
-      "detail": "Reached through a string edge at examples/css/src/csfmtnam.pco:25. Current PIC holds alphanumeric(40), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a string edge at examples/css/src/csfmtnam.pco:25. Current PIC holds alphanumeric(40), but alphanumeric(81) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [],
       "current": "01 LK-DISPLAY-KEY PIC X(40) DISPLAY",
-      "required": "alphanumeric(60)",
-      "remediation": "Change to: 01 LK-DISPLAY-KEY PIC X(60).",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 LK-DISPLAY-KEY PIC X(81).",
       "hops_from_change": 5,
       "propagation_path": [
         "col:CSS_CUSTOMER.CUST_NAME",
         "var:CSCUSTINQ::CS-CUST-NAME",
         "var:CSFMTNAM::LK-RAW-NAME",
         "var:CSFMTNAM::WS-WORK-NAME",
-        "var:CSFMTNAM::WS-LAST-NAME",
+        "var:CSFMTNAM::WS-FIRST-NAME",
         "var:CSFMTNAM::LK-DISPLAY-KEY"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 25,
           "program": "CSFMTNAM",
           "paragraph": "0000-MAIN",
           "text": "STRING WS-FIRST-NAME DELIMITED BY SPACE ' '           DELIMITED BY SIZE WS-LAST-NAME  DELIMITED BY SPACE INTO LK-DISPLAY-KEY"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 16,
           "program": "CSFMTNAM",
           "paragraph": "",
@@ -1033,14 +960,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 23,
           "program": "CSCUSTINQ",
           "paragraph": "",
           "text": "DECLARE CUST_CUR CURSOR FOR SELECT CUST_ID, CUST_NAME, CUST_CITY, CUST_STATE, CUST_BALANCE FROM CSS_CUSTOMER WHERE CUST_NAME LIKE :CS-SEARCH-NAME AND CUST_STATUS = 'A' ORDER BY CUST_NAME"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 17,
           "program": "CSCUSTINQ",
           "paragraph": "",
@@ -1066,14 +993,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 60,
           "program": "CSCUSTINQ",
           "paragraph": "2000-FORMAT-LINE",
           "text": "CALL 'CSFMTNAM' USING CS-CUST-NAME CS-CUST-KEY"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
           "line": 15,
           "program": "CSFMTNAM",
           "paragraph": "",
@@ -1100,7 +1027,7 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
           "line": 42,
           "program": "CSACCTUPD",
           "paragraph": "",
@@ -1127,34 +1054,7 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
-          "line": 54,
-          "program": "CSACCTUPD",
-          "paragraph": "",
-          "text": "INSERT INTO CSS_ACCT_AUDIT (AUDIT_ACCT_NBR, AUDIT_BILL_NAME, AUDIT_TEXT) VALUES (:CS-ACCT-NBR, :CS-ACCT-BILL-NAME, :WS-AUDIT-TEXT)"
-        }
-      ]
-    },
-    {
-      "severity": "HIGH",
-      "category": "database-column",
-      "node": "col:CSS_ACCT_AUDIT.AUDIT_TEXT",
-      "title": "CSS_ACCT_AUDIT.AUDIT_TEXT receives widened data and must grow too",
-      "detail": "A host variable carrying the widened value is bound to this column through a sql-bind edge at examples/css/src/csacctupd.pco:54. Writing the wider value into the current column raises ORA-01401/ORA-12899 or silently truncates. Its current width was inferred from the host variable bound to it, not read from the catalog \u2014 confirm against the real DDL.",
-      "notes": [],
-      "current": "alphanumeric(80) (inferred)",
-      "required": "alphanumeric(90)",
-      "remediation": "ALTER TABLE CSS_ACCT_AUDIT MODIFY AUDIT_TEXT VARCHAR2(90);",
-      "hops_from_change": 3,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSACCTUPD::CS-CUST-NAME",
-        "var:CSACCTUPD::WS-AUDIT-TEXT",
-        "col:CSS_ACCT_AUDIT.AUDIT_TEXT"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
           "line": 54,
           "program": "CSACCTUPD",
           "paragraph": "",
@@ -1181,7 +1081,7 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
           "line": 38,
           "program": "CSSVCORD",
           "paragraph": "",
@@ -1208,14 +1108,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
           "line": 45,
           "program": "CSSVCORD",
           "paragraph": "2000-CREATE-ORDER",
           "text": "CALL 'CSNOTES' USING CS-SVC-CUST-NAME CS-SVC-TECH-NOTES"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
           "line": 12,
           "program": "CSNOTES",
           "paragraph": "",
@@ -1228,39 +1128,33 @@
       "category": "derived-variable",
       "node": "var:CSBILLCYC::CS-RL-FLAT",
       "title": "CS-RL-FLAT is too small for the widened value",
-      "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(93) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(100) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [
-        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 93 - check it)",
+        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 100 - check it)",
         "display: report or log column alignment shifts."
       ],
       "current": "01 CS-RL-FLAT PIC X(83) DISPLAY",
-      "required": "alphanumeric(93)",
-      "remediation": "Change to: 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(93).",
-      "hops_from_change": 4,
+      "required": "alphanumeric(100)",
+      "remediation": "Change to: 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(100).",
+      "hops_from_change": 5,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSBILLCYC::CS-CUST-NAME",
-        "var:CSBILLCYC::CS-RL-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
         "var:CSBILLCYC::CS-REPORT-LINE",
         "var:CSBILLCYC::CS-RL-FLAT"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 15,
           "program": "CSBILLCYC",
           "paragraph": "",
           "text": "01  CS-RL-FLAT  REDEFINES  CS-REPORT-LINE  PIC X(83)"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 15,
-          "program": "CSBILLCYC",
-          "paragraph": "",
-          "text": "01  CS-RL-FLAT  REDEFINES  CS-REPORT-LINE  PIC X(83)"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
           "line": 61,
           "program": "CSBILLCYC",
           "paragraph": "2000-PRINT-LINE",
@@ -1271,58 +1165,13 @@
     {
       "severity": "HIGH",
       "category": "derived-variable",
-      "node": "var:CSCUSTINQ::CS-RL-FLAT",
-      "title": "CS-RL-FLAT is too small for the widened value",
-      "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(93) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
-      "notes": [
-        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 93 - check it)",
-        "display: report or log column alignment shifts."
-      ],
-      "current": "01 CS-RL-FLAT PIC X(83) DISPLAY",
-      "required": "alphanumeric(93)",
-      "remediation": "Change to: 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(93).",
-      "hops_from_change": 4,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSCUSTINQ::CS-RL-NAME",
-        "var:CSCUSTINQ::CS-REPORT-LINE",
-        "var:CSCUSTINQ::CS-RL-FLAT"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 15,
-          "program": "CSCUSTINQ",
-          "paragraph": "",
-          "text": "01  CS-RL-FLAT  REDEFINES  CS-REPORT-LINE  PIC X(83)"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 15,
-          "program": "CSCUSTINQ",
-          "paragraph": "",
-          "text": "01  CS-RL-FLAT  REDEFINES  CS-REPORT-LINE  PIC X(83)"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
-          "line": 61,
-          "program": "CSCUSTINQ",
-          "paragraph": "2000-FORMAT-LINE",
-          "text": "DISPLAY CS-RL-FLAT"
-        }
-      ]
-    },
-    {
-      "severity": "HIGH",
-      "category": "derived-variable",
       "node": "var:CSSVCORD::CS-SVC-TECH-NOTES",
       "title": "CS-SVC-TECH-NOTES is too small for the widened value",
-      "detail": "Reached through a call-arg edge at examples/css/src/cssvcord.pco:45. Current PIC holds alphanumeric(60), but alphanumeric(70) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a call-arg edge at examples/css/src/cssvcord.pco:45. Current PIC holds alphanumeric(60), but alphanumeric(66) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [],
       "current": "05 CS-SVC-TECH-NOTES PIC X(60) DISPLAY",
-      "required": "alphanumeric(70)",
-      "remediation": "Change to: 05 CS-SVC-TECH-NOTES PIC X(70).",
+      "required": "alphanumeric(66)",
+      "remediation": "Change to: 05 CS-SVC-TECH-NOTES PIC X(66).",
       "hops_from_change": 5,
       "propagation_path": [
         "col:CSS_CUSTOMER.CUST_NAME",
@@ -1334,14 +1183,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
           "line": 45,
           "program": "CSSVCORD",
           "paragraph": "2000-CREATE-ORDER",
           "text": "CALL 'CSNOTES' USING CS-SVC-CUST-NAME CS-SVC-TECH-NOTES"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSSVC.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
           "line": 11,
           "program": "CSSVCORD",
           "paragraph": "",
@@ -1354,31 +1203,31 @@
       "category": "derived-variable",
       "node": "var:CSCUSTINQ::CS-CUST-KEY",
       "title": "CS-CUST-KEY is too small for the widened value",
-      "detail": "Reached through a call-arg edge at examples/css/src/cscustinq.pco:60. Current PIC holds alphanumeric(40), but alphanumeric(60) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "detail": "Reached through a call-arg edge at examples/css/src/cscustinq.pco:60. Current PIC holds alphanumeric(40), but alphanumeric(81) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
       "notes": [],
       "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
-      "required": "alphanumeric(60)",
-      "remediation": "Change to: 01 CS-CUST-KEY PIC X(60).",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
       "hops_from_change": 6,
       "propagation_path": [
         "col:CSS_CUSTOMER.CUST_NAME",
         "var:CSCUSTINQ::CS-CUST-NAME",
         "var:CSFMTNAM::LK-RAW-NAME",
         "var:CSFMTNAM::WS-WORK-NAME",
-        "var:CSFMTNAM::WS-LAST-NAME",
+        "var:CSFMTNAM::WS-FIRST-NAME",
         "var:CSFMTNAM::LK-DISPLAY-KEY",
         "var:CSCUSTINQ::CS-CUST-KEY"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
           "line": 60,
           "program": "CSCUSTINQ",
           "paragraph": "2000-FORMAT-LINE",
           "text": "CALL 'CSFMTNAM' USING CS-CUST-NAME CS-CUST-KEY"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 18,
           "program": "CSCUSTINQ",
           "paragraph": "",
@@ -1387,31 +1236,113 @@
       ]
     },
     {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:CSCUSTINQ::CS-RL-FLAT",
+      "title": "CS-RL-FLAT is too small for the widened value",
+      "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(100) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 100 - check it)",
+        "display: report or log column alignment shifts."
+      ],
+      "current": "01 CS-RL-FLAT PIC X(83) DISPLAY",
+      "required": "alphanumeric(100)",
+      "remediation": "Change to: 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(100).",
+      "hops_from_change": 7,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:11:CS-RL-BALANCE",
+        "var:CSCUSTINQ::CS-RL-BALANCE",
+        "var:CSCUSTINQ::CS-REPORT-LINE",
+        "var:CSCUSTINQ::CS-RL-FLAT"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 15,
+          "program": "CSCUSTINQ",
+          "paragraph": "",
+          "text": "01  CS-RL-FLAT  REDEFINES  CS-REPORT-LINE  PIC X(83)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
+          "line": 61,
+          "program": "CSCUSTINQ",
+          "paragraph": "2000-FORMAT-LINE",
+          "text": "DISPLAY CS-RL-FLAT"
+        }
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "category": "derived-variable",
+      "node": "var:CSCUSTRPT::CS-RL-FLAT",
+      "title": "CS-RL-FLAT is too small for the widened value",
+      "detail": "Reached through a redefines edge at examples/css/copybooks/CSWORK.cpy:15. Current PIC holds alphanumeric(83), but alphanumeric(100) arrives here. COBOL truncates on the left for numerics and on the right for alphanumerics, without any runtime error.",
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-REPORT-LINE (83 bytes, smaller than the new 100 - check it)",
+        "display: report or log column alignment shifts."
+      ],
+      "current": "01 CS-RL-FLAT PIC X(83) DISPLAY",
+      "required": "alphanumeric(100)",
+      "remediation": "Change to: 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(100).",
+      "hops_from_change": 7,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:11:CS-RL-BALANCE",
+        "var:CSCUSTRPT::CS-RL-BALANCE",
+        "var:CSCUSTRPT::CS-REPORT-LINE",
+        "var:CSCUSTRPT::CS-RL-FLAT"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 15,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "01  CS-RL-FLAT  REDEFINES  CS-REPORT-LINE  PIC X(83)"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustrpt.pco",
+          "line": 20,
+          "program": "CSCUSTRPT",
+          "paragraph": "0000-MAIN",
+          "text": "DISPLAY CS-RL-FLAT"
+        }
+      ]
+    },
+    {
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:CSACCTUPD::CS-CUSTOMER-REC",
-      "title": "CS-CUSTOMER-REC: record length grows 146 -> 156 bytes",
+      "title": "CS-CUSTOMER-REC: record length grows 146 -> 157 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
       "current": "146 bytes",
-      "required": "156 bytes",
+      "required": "157 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 2,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSACCTUPD::CS-CUST-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
         "var:CSACCTUPD::CS-CUSTOMER-REC"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-          "line": 7,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 14,
           "program": "CSACCTUPD",
           "paragraph": "",
-          "text": "05  CS-CUST-NAME         PIC X(30)"
+          "text": "05  CS-CUST-BALANCE      PIC S9(9)V99    COMP-3"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 5,
           "program": "CSACCTUPD",
           "paragraph": "",
@@ -1423,28 +1354,28 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:CSBILLCYC::CS-CUSTOMER-REC",
-      "title": "CS-CUSTOMER-REC: record length grows 146 -> 156 bytes",
+      "title": "CS-CUSTOMER-REC: record length grows 146 -> 157 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
       "current": "146 bytes",
-      "required": "156 bytes",
+      "required": "157 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 2,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSBILLCYC::CS-CUST-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
         "var:CSBILLCYC::CS-CUSTOMER-REC"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-          "line": 7,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 14,
           "program": "CSBILLCYC",
           "paragraph": "",
-          "text": "05  CS-CUST-NAME         PIC X(30)"
+          "text": "05  CS-CUST-BALANCE      PIC S9(9)V99    COMP-3"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 5,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -1456,63 +1387,30 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:CSCUSTINQ::CS-CUSTOMER-REC",
-      "title": "CS-CUSTOMER-REC: record length grows 146 -> 156 bytes",
+      "title": "CS-CUSTOMER-REC: record length grows 146 -> 157 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
       "current": "146 bytes",
-      "required": "156 bytes",
+      "required": "157 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
       "hops_from_change": 2,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSCUSTINQ::CS-CUST-BALANCE",
         "var:CSCUSTINQ::CS-CUSTOMER-REC"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-          "line": 7,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 14,
           "program": "CSCUSTINQ",
           "paragraph": "",
-          "text": "05  CS-CUST-NAME         PIC X(30)"
+          "text": "05  CS-CUST-BALANCE      PIC S9(9)V99    COMP-3"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
           "line": 5,
           "program": "CSCUSTINQ",
-          "paragraph": "",
-          "text": "01  CS-CUSTOMER-REC"
-        }
-      ]
-    },
-    {
-      "severity": "MEDIUM",
-      "category": "record-layout",
-      "node": "var:CSSVCORD::CS-CUSTOMER-REC",
-      "title": "CS-CUSTOMER-REC: record length grows 146 -> 156 bytes",
-      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
-      "notes": [],
-      "current": "146 bytes",
-      "required": "156 bytes",
-      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 2,
-      "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSSVCORD::CS-CUST-NAME",
-        "var:CSSVCORD::CS-CUSTOMER-REC"
-      ],
-      "references": [
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-          "line": 7,
-          "program": "CSSVCORD",
-          "paragraph": "",
-          "text": "05  CS-CUST-NAME         PIC X(30)"
-        },
-        {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-          "line": 5,
-          "program": "CSSVCORD",
           "paragraph": "",
           "text": "01  CS-CUSTOMER-REC"
         }
@@ -1537,14 +1435,14 @@
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSACCT.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSACCT.cpy",
           "line": 10,
           "program": "CSACCTUPD",
           "paragraph": "",
           "text": "05  CS-ACCT-BILL-NAME    PIC X(30)"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSACCT.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSACCT.cpy",
           "line": 5,
           "program": "CSACCTUPD",
           "paragraph": "",
@@ -1556,31 +1454,32 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:CSBILLCYC::CS-REPORT-LINE",
-      "title": "CS-REPORT-LINE: record length grows 83 -> 93 bytes",
+      "title": "CS-REPORT-LINE: record length grows 83 -> 100 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [
-        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 93 - check it)"
+        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 100 - check it)"
       ],
       "current": "83 bytes",
-      "required": "93 bytes",
+      "required": "100 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 3,
+      "hops_from_change": 4,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSBILLCYC::CS-CUST-NAME",
-        "var:CSBILLCYC::CS-RL-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
         "var:CSBILLCYC::CS-REPORT-LINE"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 7,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 11,
           "program": "CSBILLCYC",
           "paragraph": "",
-          "text": "05  CS-RL-NAME           PIC X(30)"
+          "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 4,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -1592,29 +1491,30 @@
       "severity": "MEDIUM",
       "category": "record-layout",
       "node": "var:CSBILLCYC::CS-XTRACT-REC",
-      "title": "CS-XTRACT-REC: record length grows 87 -> 97 bytes",
+      "title": "CS-XTRACT-REC: record length grows 87 -> 98 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
       "current": "87 bytes",
-      "required": "97 bytes",
+      "required": "98 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 3,
+      "hops_from_change": 4,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSBILLCYC::CS-CUST-NAME",
-        "var:CSBILLCYC::XT-CUST-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::XT-BALANCE",
         "var:CSBILLCYC::CS-XTRACT-REC"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSXTRACT.cpy",
-          "line": 7,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSXTRACT.cpy",
+          "line": 9,
           "program": "CSBILLCYC",
           "paragraph": "",
-          "text": "05  XT-CUST-NAME         PIC X(30)"
+          "text": "05  XT-BALANCE           PIC S9(11)V99   COMP-3"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSXTRACT.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSXTRACT.cpy",
           "line": 5,
           "program": "CSBILLCYC",
           "paragraph": "",
@@ -1625,32 +1525,119 @@
     {
       "severity": "MEDIUM",
       "category": "record-layout",
+      "node": "var:CSCUSTRPT::CS-CUSTOMER-REC",
+      "title": "CS-CUSTOMER-REC: record length grows 146 -> 157 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "146 bytes",
+      "required": "157 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
+        "var:CSACCTUPD::CS-CUSTOMER-REC",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:5:CS-CUSTOMER-REC",
+        "var:CSCUSTRPT::CS-CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 5,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "01  CS-CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CSPURGE::CS-CUSTOMER-REC",
+      "title": "CS-CUSTOMER-REC: record length grows 146 -> 157 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "146 bytes",
+      "required": "157 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
+        "var:CSACCTUPD::CS-CUSTOMER-REC",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:5:CS-CUSTOMER-REC",
+        "var:CSPURGE::CS-CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 5,
+          "program": "CSPURGE",
+          "paragraph": "",
+          "text": "01  CS-CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
+      "node": "var:CSSVCORD::CS-CUSTOMER-REC",
+      "title": "CS-CUSTOMER-REC: record length grows 146 -> 157 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [],
+      "current": "146 bytes",
+      "required": "157 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
+        "var:CSACCTUPD::CS-CUSTOMER-REC",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:5:CS-CUSTOMER-REC",
+        "var:CSSVCORD::CS-CUSTOMER-REC"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 5,
+          "program": "CSSVCORD",
+          "paragraph": "",
+          "text": "01  CS-CUSTOMER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
       "node": "var:CSCUSTINQ::CS-REPORT-LINE",
-      "title": "CS-REPORT-LINE: record length grows 83 -> 93 bytes",
+      "title": "CS-REPORT-LINE: record length grows 83 -> 100 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [
-        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 93 - check it)"
+        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 100 - check it)"
       ],
       "current": "83 bytes",
-      "required": "93 bytes",
+      "required": "100 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 3,
+      "hops_from_change": 6,
       "propagation_path": [
-        "col:CSS_CUSTOMER.CUST_NAME",
-        "var:CSCUSTINQ::CS-CUST-NAME",
-        "var:CSCUSTINQ::CS-RL-NAME",
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:11:CS-RL-BALANCE",
+        "var:CSCUSTINQ::CS-RL-BALANCE",
         "var:CSCUSTINQ::CS-REPORT-LINE"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-          "line": 7,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 11,
           "program": "CSCUSTINQ",
           "paragraph": "",
-          "text": "05  CS-RL-NAME           PIC X(30)"
+          "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
           "line": 4,
           "program": "CSCUSTINQ",
           "paragraph": "",
@@ -1661,34 +1648,386 @@
     {
       "severity": "MEDIUM",
       "category": "record-layout",
+      "node": "var:CSCUSTRPT::CS-REPORT-LINE",
+      "title": "CS-REPORT-LINE: record length grows 83 -> 100 bytes",
+      "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
+      "notes": [
+        "overlays the same storage (REDEFINES): 01 CS-RL-FLAT REDEFINES CS-REPORT-LINE PIC X(83) (83 bytes, smaller than the new 100 - check it)"
+      ],
+      "current": "83 bytes",
+      "required": "100 bytes",
+      "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
+      "hops_from_change": 6,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:11:CS-RL-BALANCE",
+        "var:CSCUSTRPT::CS-RL-BALANCE",
+        "var:CSCUSTRPT::CS-REPORT-LINE"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 11,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
+        },
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 4,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "01  CS-REPORT-LINE"
+        }
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "record-layout",
       "node": "var:CSSVCORD::CS-SVC-ORDER-REC",
-      "title": "CS-SVC-ORDER-REC: record length grows 109 -> 119 bytes",
+      "title": "CS-SVC-ORDER-REC: record length grows 109 -> 125 bytes",
       "detail": "This group contains a field that must widen, so every file, queue, CALL interface or REDEFINES that assumes the old record length has to be reviewed and rebuilt.",
       "notes": [],
       "current": "109 bytes",
-      "required": "119 bytes",
+      "required": "125 bytes",
       "remediation": "Rebuild the record layout, then recompile every program that copies this group and reload any file written with the old length.",
-      "hops_from_change": 3,
+      "hops_from_change": 6,
       "propagation_path": [
         "col:CSS_CUSTOMER.CUST_NAME",
         "var:CSSVCORD::CS-CUST-NAME",
         "var:CSSVCORD::CS-SVC-CUST-NAME",
+        "var:CSNOTES::LK-CUST-NAME",
+        "var:CSNOTES::LK-TECH-NOTES",
+        "var:CSSVCORD::CS-SVC-TECH-NOTES",
         "var:CSSVCORD::CS-SVC-ORDER-REC"
       ],
       "references": [
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSSVC.cpy",
-          "line": 8,
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
+          "line": 11,
           "program": "CSSVCORD",
           "paragraph": "",
-          "text": "05  CS-SVC-CUST-NAME     PIC X(30)"
+          "text": "05  CS-SVC-TECH-NOTES    PIC X(60)"
         },
         {
-          "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSSVC.cpy",
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy",
           "line": 5,
           "program": "CSSVCORD",
           "paragraph": "",
           "text": "01  CS-SVC-ORDER-REC"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSBILLCYC::CS-SEARCH-NAME",
+      "title": "CS-SEARCH-NAME widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(40). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "01 CS-SEARCH-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(40)",
+      "remediation": "Change to: 01 CS-SEARCH-NAME PIC X(40).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-SEARCH-NAME",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:17:CS-SEARCH-NAME",
+        "var:CSBILLCYC::CS-SEARCH-NAME"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 17,
+          "program": "CSBILLCYC",
+          "paragraph": "",
+          "text": "01  CS-SEARCH-NAME           PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-CUST-BALANCE",
+      "title": "CS-CUST-BALANCE widens with CSCUST.cpy",
+      "detail": "CSCUST.cpy is edited because another program needs this field to hold signed numeric(11.2). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-CUST-BALANCE PIC S9(9)V99 COMP-3",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 CS-CUST-BALANCE PIC S9(11)V9(2) COMP-3.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:14:CS-CUST-BALANCE",
+        "var:CSCUSTRPT::CS-CUST-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 14,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "05  CS-CUST-BALANCE      PIC S9(9)V99    COMP-3"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-CUST-NAME",
+      "title": "CS-CUST-NAME widens with CSCUST.cpy",
+      "detail": "CSCUST.cpy is edited because another program needs this field to hold alphanumeric(40). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(40)",
+      "remediation": "Change to: 05 CS-CUST-NAME PIC X(40).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSACCTUPD::CS-CUST-NAME",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:7:CS-CUST-NAME",
+        "var:CSCUSTRPT::CS-CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 7,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "05  CS-CUST-NAME         PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-SEARCH-NAME",
+      "title": "CS-SEARCH-NAME widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(40). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "01 CS-SEARCH-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(40)",
+      "remediation": "Change to: 01 CS-SEARCH-NAME PIC X(40).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-SEARCH-NAME",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:17:CS-SEARCH-NAME",
+        "var:CSCUSTRPT::CS-SEARCH-NAME"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 17,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "01  CS-SEARCH-NAME           PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSPURGE::CS-CUST-BALANCE",
+      "title": "CS-CUST-BALANCE widens with CSCUST.cpy",
+      "detail": "CSCUST.cpy is edited because another program needs this field to hold signed numeric(11.2). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-CUST-BALANCE PIC S9(9)V99 COMP-3",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 CS-CUST-BALANCE PIC S9(11)V9(2) COMP-3.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:14:CS-CUST-BALANCE",
+        "var:CSPURGE::CS-CUST-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 14,
+          "program": "CSPURGE",
+          "paragraph": "",
+          "text": "05  CS-CUST-BALANCE      PIC S9(9)V99    COMP-3"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSPURGE::CS-CUST-NAME",
+      "title": "CS-CUST-NAME widens with CSCUST.cpy",
+      "detail": "CSCUST.cpy is edited because another program needs this field to hold alphanumeric(40). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-CUST-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(40)",
+      "remediation": "Change to: 05 CS-CUST-NAME PIC X(40).",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSACCTUPD::CS-CUST-NAME",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:7:CS-CUST-NAME",
+        "var:CSPURGE::CS-CUST-NAME"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 7,
+          "program": "CSPURGE",
+          "paragraph": "",
+          "text": "05  CS-CUST-NAME         PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSSVCORD::CS-CUST-BALANCE",
+      "title": "CS-CUST-BALANCE widens with CSCUST.cpy",
+      "detail": "CSCUST.cpy is edited because another program needs this field to hold signed numeric(11.2). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-CUST-BALANCE PIC S9(9)V99 COMP-3",
+      "required": "signed numeric(11.2)",
+      "remediation": "Change to: 05 CS-CUST-BALANCE PIC S9(11)V9(2) COMP-3.",
+      "hops_from_change": 3,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSACCTUPD::CS-CUST-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy:14:CS-CUST-BALANCE",
+        "var:CSSVCORD::CS-CUST-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+          "line": 14,
+          "program": "CSSVCORD",
+          "paragraph": "",
+          "text": "05  CS-CUST-BALANCE      PIC S9(9)V99    COMP-3"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-RL-NAME",
+      "title": "CS-RL-NAME widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(40). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-RL-NAME PIC X(30) DISPLAY",
+      "required": "alphanumeric(40)",
+      "remediation": "Change to: 05 CS-RL-NAME PIC X(40).",
+      "hops_from_change": 4,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSBILLCYC::CS-CUST-NAME",
+        "var:CSBILLCYC::CS-RL-NAME",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:7:CS-RL-NAME",
+        "var:CSCUSTRPT::CS-RL-NAME"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 7,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "05  CS-RL-NAME           PIC X(30)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-RL-BALANCE",
+      "title": "CS-RL-BALANCE widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold signed numeric(13.2). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "05 CS-RL-BALANCE PIC ZZ,ZZZ,ZZ9.99- DISPLAY",
+      "required": "signed numeric(13.2)",
+      "remediation": "Change to: 05 CS-RL-BALANCE PIC Z,ZZZ,ZZZ,ZZZ,ZZ9.99-.",
+      "hops_from_change": 5,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_BALANCE",
+        "var:CSBILLCYC::CS-CUST-BALANCE",
+        "var:CSBILLCYC::WS-NEW-BALANCE",
+        "var:CSBILLCYC::CS-RL-BALANCE",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:11:CS-RL-BALANCE",
+        "var:CSCUSTRPT::CS-RL-BALANCE"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 11,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "05  CS-RL-BALANCE        PIC ZZ,ZZZ,ZZ9.99-"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSBILLCYC::CS-CUST-KEY",
+      "title": "CS-CUST-KEY widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(81). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
+      "hops_from_change": 8,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-CUST-NAME",
+        "var:CSFMTNAM::LK-RAW-NAME",
+        "var:CSFMTNAM::WS-WORK-NAME",
+        "var:CSFMTNAM::WS-FIRST-NAME",
+        "var:CSFMTNAM::LK-DISPLAY-KEY",
+        "var:CSCUSTINQ::CS-CUST-KEY",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:18:CS-CUST-KEY",
+        "var:CSBILLCYC::CS-CUST-KEY"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 18,
+          "program": "CSBILLCYC",
+          "paragraph": "",
+          "text": "01  CS-CUST-KEY              PIC X(40)"
+        }
+      ]
+    },
+    {
+      "severity": "LOW",
+      "category": "copybook-field",
+      "node": "var:CSCUSTRPT::CS-CUST-KEY",
+      "title": "CS-CUST-KEY widens with CSWORK.cpy",
+      "detail": "CSWORK.cpy is edited because another program needs this field to hold alphanumeric(81). No widened value reaches it in this program, so rebuilding against the new copybook is enough, unless a statement here assumes the old width.",
+      "notes": [],
+      "current": "01 CS-CUST-KEY PIC X(40) DISPLAY",
+      "required": "alphanumeric(81)",
+      "remediation": "Change to: 01 CS-CUST-KEY PIC X(81).",
+      "hops_from_change": 8,
+      "propagation_path": [
+        "col:CSS_CUSTOMER.CUST_NAME",
+        "var:CSCUSTINQ::CS-CUST-NAME",
+        "var:CSFMTNAM::LK-RAW-NAME",
+        "var:CSFMTNAM::WS-WORK-NAME",
+        "var:CSFMTNAM::WS-FIRST-NAME",
+        "var:CSFMTNAM::LK-DISPLAY-KEY",
+        "var:CSCUSTINQ::CS-CUST-KEY",
+        "decl:/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy:18:CS-CUST-KEY",
+        "var:CSCUSTRPT::CS-CUST-KEY"
+      ],
+      "references": [
+        {
+          "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+          "line": 18,
+          "program": "CSCUSTRPT",
+          "paragraph": "",
+          "text": "01  CS-CUST-KEY              PIC X(40)"
         }
       ]
     },
@@ -1728,76 +2067,76 @@
   "programs": [
     {
       "name": "CSACCTUPD",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csacctupd.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csacctupd.pco",
       "sql_statements": 9,
       "data_items": 25,
       "copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSACCT.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSACCT.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy"
       ]
     },
     {
       "name": "CSBILLCYC",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csbillcyc.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csbillcyc.pco",
       "sql_statements": 8,
       "data_items": 42,
       "copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSXTRACT.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSXTRACT.cpy"
       ]
     },
     {
       "name": "CSCUSTINQ",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustinq.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustinq.pco",
       "sql_statements": 8,
       "data_items": 32,
       "copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy"
       ]
     },
     {
       "name": "CSCUSTRPT",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cscustrpt.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cscustrpt.pco",
       "sql_statements": 2,
       "data_items": 28,
       "copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSWORK.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSWORK.cpy"
       ]
     },
     {
       "name": "CSFMTNAM",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csfmtnam.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csfmtnam.pco",
       "sql_statements": 0,
       "data_items": 6,
       "copybooks": []
     },
     {
       "name": "CSNOTES",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\csnotes.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/csnotes.pco",
       "sql_statements": 0,
       "data_items": 3,
       "copybooks": []
     },
     {
       "name": "CSPURGE",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cspurge.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cspurge.pco",
       "sql_statements": 3,
       "data_items": 16,
       "copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy"
       ]
     },
     {
       "name": "CSSVCORD",
-      "path": "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\src\\cssvcord.pco",
+      "path": "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/src/cssvcord.pco",
       "sql_statements": 7,
       "data_items": 23,
       "copybooks": [
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSCUST.cpy",
-        "C:\\Users\\cdiet\\Documents\\GitHub\\cobol-impact-analyzer\\examples\\css\\copybooks\\CSSVC.cpy"
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSCUST.cpy",
+        "/Users/chrisdietz/Documents/GitHub/cobol-impact-analyzer/examples/css/copybooks/CSSVC.cpy"
       ]
     }
   ],

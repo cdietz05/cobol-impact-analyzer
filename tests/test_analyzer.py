@@ -435,11 +435,11 @@ class ProgramImpactTests(unittest.TestCase):
         self.assertTrue(any(book.endswith("CUSTOMER.cpy") for book in impact.changed_copybooks))
 
     def test_a_program_that_never_touches_the_field_is_still_rebuilt(self):
-        # CUSTPURG includes CUSTOMER.cpy and only ever DELETEs. Nothing flows
-        # through CUST-NAME here, so per-program scoping finds no impacted node
-        # in it at all - but the copybook it compiles against still changes
-        # shape, so it still has to be rebuilt. These are the programs most
-        # likely to be missed, because nothing in them looks different.
+        # CUSTPURG includes CUSTOMER.cpy and only ever DELETEs. No widened value
+        # flows through CUST-NAME here - it widens only because the copybook is
+        # edited - but the copybook it compiles against still changes shape, so
+        # it still has to be rebuilt. These are the programs most likely to be
+        # missed, because nothing in them looks different.
         impact = self._impact("CUSTPURG")
         self.assertTrue(impact.recompile_only)
         self.assertEqual(impact.own_work, [])
@@ -573,6 +573,218 @@ class VariableScopeTests(unittest.TestCase):
             # FMTNAME is reached by CALL USING, so a path may legitimately name
             # two programs; it must never name three unrelated ones.
             self.assertLessEqual(len(set(programs)), 2, finding.path)
+
+
+
+def _both_columns():
+    return analyze(
+        _spec(
+            build_change("CUSTOMER", "CUST_NAME", "VARCHAR2(30)", "VARCHAR2(60)"),
+            build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"),
+        )
+    )
+
+
+def _layout(result, node_id):
+    return [f for f in _find(result, node_id) if f.category == "record-layout"]
+
+
+class RecordLengthTests(unittest.TestCase):
+    """Record lengths are bytes, summed over every member that grows."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _both_columns()
+
+    def test_a_record_counts_every_member_that_grows(self):
+        # 114 bytes, plus 30 for CUST-NAME, plus 1 for CUST-BALANCE. Keeping
+        # only the larger increase reported 144.
+        [finding] = _layout(self.result, "var:CUSTUPD::CUSTOMER-REC")
+        self.assertEqual(finding.required, "145 bytes")
+
+    def test_one_copybook_has_one_record_length_in_every_program(self):
+        # CUSTTBL only fetches the balance and CUSTLIST only the name, but they
+        # compile against the same edited CUSTOMER.cpy.
+        for program in ("CUSTARCH", "CUSTLIST", "CUSTPURG", "CUSTTBL", "CUSTUPD", "ORDENTRY"):
+            [finding] = _layout(self.result, f"var:{program}::CUSTOMER-REC")
+            self.assertEqual(finding.required, "145 bytes", program)
+
+    def test_a_packed_field_grows_its_record_in_bytes_not_digits(self):
+        result = analyze(
+            _spec(build_change("CUSTOMER", "CUST_BALANCE", "NUMBER(11,2)", "NUMBER(13,2)"))
+        )
+        # S9(9)V99 COMP-3 is 6 bytes, S9(11)V99 COMP-3 is 7.
+        [finding] = _layout(result, "var:CUSTTBL::CUSTOMER-REC")
+        self.assertEqual(finding.required, "115 bytes")
+
+    def test_a_table_grows_by_every_entry(self):
+        # 100 entries, one more byte each.
+        [finding] = _layout(self.result, "var:CUSTTBL::WS-BAL-TABLE")
+        self.assertEqual(finding.required, "700 bytes")
+
+    def test_an_edited_field_adds_its_punctuation_to_the_record(self):
+        # 83 bytes, plus 30 for RL-CUST-NAME, plus 4 for RL-BALANCE growing
+        # from ZZ,ZZZ,ZZ9.99- to ZZ,ZZZ,ZZZ,ZZ9.99-.
+        [finding] = _layout(self.result, "var:CUSTUPD::WS-REPORT-LINE")
+        self.assertEqual(finding.required, "117 bytes")
+
+    def test_a_location_is_listed_once(self):
+        [finding] = _find(self.result, "var:CUSTUPD::WS-REPORT-FLAT")
+        locations = [(ref.path, ref.line) for ref in finding.refs]
+        self.assertEqual(len(locations), len(set(locations)), locations)
+
+
+class CopybookFieldTests(unittest.TestCase):
+    """A copybook field widened by another program's need for it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _run_name_widening()
+
+    def test_it_is_reported_as_a_rebuild(self):
+        [finding] = _find(self.result, "var:CUSTPURG::CUST-NAME")
+        self.assertEqual(finding.category, "copybook-field")
+        self.assertIs(finding.severity, Severity.LOW)
+        self.assertIn("X(60)", finding.remediation)
+
+    def test_the_route_goes_through_the_copybook(self):
+        [finding] = _find(self.result, "var:CUSTPURG::CUST-NAME")
+        self.assertTrue(any(node.startswith("decl:") for node in finding.path), finding.path)
+
+    def test_the_program_is_still_recompile_only(self):
+        [impact] = [i for i in self.result.program_impacts if i.program == "CUSTPURG"]
+        self.assertTrue(impact.recompile_only)
+
+    def test_a_later_copybook_link_does_not_downgrade_a_truncation(self):
+        # CSCUSTINQ MOVEs its own fetched balance into CS-RL-BALANCE, which
+        # truncates. CSBILLCYC then needs the same copybook field wider still,
+        # and that non-truncating link grew it last - which used to turn the
+        # CRITICAL into HIGH.
+        result = analyze(load_spec(EXAMPLES / "css" / "change_spec.json"))
+        [finding] = _find(result, "var:CSCUSTINQ::CS-RL-BALANCE")
+        self.assertIs(finding.severity, Severity.CRITICAL)
+
+    def test_a_field_widened_by_fetching_it_is_still_critical(self):
+        [finding] = _find(self.result, "var:CUSTLIST::CUST-NAME")
+        self.assertEqual(finding.category, "host-variable")
+        self.assertIs(finding.severity, Severity.CRITICAL)
+
+
+class ReferenceModificationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.result = _run_name_widening()
+
+    def test_a_fixed_length_slice_does_not_widen_its_target(self):
+        # MOVE CUST-NAME (1:20) TO WS-SNAPSHOT-NAME moves 20 characters however
+        # wide CUST-NAME grows.
+        self.assertFalse(_find(self.result, "var:CUSTUPD::WS-SNAPSHOT-NAME"))
+
+    def test_nor_the_column_that_target_is_written_to(self):
+        self.assertFalse(_find(self.result, "col:ORDER_AUDIT.AUDIT_CUST_NAME"))
+        self.assertNotIn("ORDER_AUDIT", "\n".join(self.result.ddl))
+
+
+class StringTargetTests(unittest.TestCase):
+    def test_a_target_with_room_to_spare_is_not_reported(self):
+        # STRING WS-WORK-NAME DELIMITED BY SIZE INTO LK-FULL-ADDRESS puts at
+        # most 60 characters into 70.
+        result = _run_name_widening()
+        self.assertFalse(_find(result, "var:FMTNAME::LK-FULL-ADDRESS"))
+        self.assertFalse(_find(result, "var:CUSTUPD::WS-FULL-ADDRESS"))
+
+
+_FIXTURE_CALLER = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. WIDTHS.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-A                     PIC X(30).
+       01  WS-B                     PIC X(30).
+       01  WS-PAIR                  PIC X(60).
+       01  WS-TAIL                  PIC X(30).
+       01  WS-GRP.
+           05  G-A                  PIC X(30).
+           05  G-B                  PIC X(30).
+       01  WS-TBL.
+           05  T-ENT                PIC X(30) OCCURS 10 TIMES.
+       01  WS-IDX                   PIC S9(4) COMP.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           EXEC SQL
+               SELECT NAME_A, NAME_B INTO :WS-A, :WS-B
+                 FROM T1 WHERE ID = 1
+           END-EXEC
+           STRING WS-A DELIMITED BY SIZE
+                  '-' DELIMITED BY SIZE
+                  WS-B DELIMITED BY SIZE INTO WS-PAIR END-STRING
+           MOVE WS-A (11:) TO WS-TAIL
+           MOVE WS-A TO G-A
+           MOVE WS-B TO G-B
+           MOVE WS-A TO T-ENT (WS-IDX)
+           CALL 'WIDTHSUB' USING BY CONTENT 'X' WS-A
+           GOBACK.
+"""
+
+_FIXTURE_CALLEE = """\
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. WIDTHSUB.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  LK-FLAG                  PIC X(01).
+       01  LK-NAME                  PIC X(30).
+       PROCEDURE DIVISION USING LK-FLAG LK-NAME.
+       0000-MAIN.
+           GOBACK.
+"""
+
+
+class WidthArithmeticTests(unittest.TestCase):
+    """Two columns widening together, through every combining shape."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        root = Path(cls._tmp.name)
+        (root / "widths.pco").write_text(_FIXTURE_CALLER)
+        (root / "widthsub.pco").write_text(_FIXTURE_CALLEE)
+        cls.result = analyze(
+            ChangeSpec(
+                changes=[
+                    build_change("T1", "NAME_A", "VARCHAR2(30)", "VARCHAR2(60)"),
+                    build_change("T1", "NAME_B", "VARCHAR2(30)", "VARCHAR2(60)"),
+                ],
+                source_paths=[root],
+                copybook_paths=[],
+                source_patterns=["*.pco"],
+            )
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_a_string_target_holds_every_source_plus_its_literals(self):
+        # 60 + 1 + 60. Keeping only the larger increase gave 90.
+        [finding] = _find(self.result, "var:WIDTHS::WS-PAIR")
+        self.assertIn("X(121)", finding.remediation)
+
+    def test_an_open_ended_slice_carries_the_rest_of_the_field(self):
+        # WS-A (11:) is 50 characters once WS-A is 60.
+        [finding] = _find(self.result, "var:WIDTHS::WS-TAIL")
+        self.assertIn("X(50)", finding.remediation)
+
+    def test_a_group_adds_up_its_members(self):
+        [finding] = _layout(self.result, "var:WIDTHS::WS-GRP")
+        self.assertEqual(finding.required, "120 bytes")
+
+    def test_a_table_multiplies_by_its_occurs(self):
+        [finding] = _layout(self.result, "var:WIDTHS::WS-TBL")
+        self.assertEqual(finding.required, "600 bytes")
+
+    def test_a_literal_argument_does_not_shift_the_rest(self):
+        self.assertTrue(_find(self.result, "var:WIDTHSUB::LK-NAME"))
+        self.assertFalse(_find(self.result, "var:WIDTHSUB::LK-FLAG"))
 
 
 if __name__ == "__main__":
